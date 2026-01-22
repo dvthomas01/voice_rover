@@ -1,0 +1,17 @@
+# Serial communication
+pyserial>=3.5
+
+# Audio processing
+numpy>=1.24.0
+pyaudio>=0.2.13
+
+# Wake word detection
+pvporcupine>=3.0.0
+
+# Speech-to-text
+openai-whisper>=20230314
+torch>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-mock>=3.11.1
