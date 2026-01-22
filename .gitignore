@@ -35,3 +35,6 @@ Thumbs.db
 # Memory Bank and Claude-specific files (not for public repo)
 memory-bank/
 CLAUDE.md
+
+#Extra
+.github_setup_instructions.md

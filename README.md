@@ -125,16 +125,25 @@ After wake word detection, speak a command clearly. The system will transcribe, 
 ### Command Examples
 
 **Primitive Commands:**
-- "Move forward 2 meters"
-- "Turn left 90 degrees"
-- "Move backward 1 meter"
-- "Turn right 45 degrees"
+- "Move forward" (default speed 0.4)
+- "Move backward" (default speed 0.4)
+- "Rotate clockwise" (default speed 0.4)
+- "Rotate counterclockwise" (default speed 0.4)
 - "Stop"
 
 **Intermediate Commands:**
-- "Turn around" → Expands to: turn 180 degrees
-- "Make a circle" → Expands to: series of forward + turn commands
-- "Draw a square" → Expands to: forward + turn sequence
+- "Turn left 90 degrees" (default speed 0.4)
+- "Turn right 45 degrees" (default speed 0.4)
+- "Move forward for 2 seconds" (default speed 0.4)
+- "Move backward for 1 second" (default speed 0.4)
+- "Make a square" (default side length 0.5m, speed 0.4)
+- "Make a circle" (default radius 0.5m, speed 0.4, direction left)
+- "Make a star" (default size 0.5m, speed 0.4, optional)
+- "Zigzag" (default segment 0.3m, angle 45°, 4 repetitions, speed 0.4)
+- "Spin for 2 seconds" (default speed 0.5)
+
+**Advanced Commands:**
+- "Dance"
 
 **STOP Command:**
 The STOP command has the highest priority. It immediately clears the command queue and stops all motors. This command bypasses the normal queue and is sent directly to the ESP32.
@@ -145,26 +154,40 @@ The STOP command has the highest priority. It immediately clears the command que
 
 | Command | Parameters | Description |
 |---------|------------|-------------|
-| `move_forward` | `distance` (meters), `speed` (optional) | Move forward |
-| `move_backward` | `distance` (meters), `speed` (optional) | Move backward |
-| `turn_left` | `angle` (degrees) | Rotate left |
-| `turn_right` | `angle` (degrees) | Rotate right |
+| `move_forward` | `speed` (default: 0.4) | Move forward continuously |
+| `move_backward` | `speed` (default: 0.4) | Move backward continuously |
+| `rotate_clockwise` | `speed` (default: 0.4) | Rotate clockwise continuously |
+| `rotate_counterclockwise` | `speed` (default: 0.4) | Rotate counterclockwise continuously |
 | `stop` | None | Immediate stop |
 
 ### Intermediate Commands
 
 Intermediate commands are expanded by the command parser into sequences of primitive commands:
 
-- **turn_around**: `turn_left(180)`
-- **circle**: Configurable radius, expanded to forward + turn sequence
-- **square**: Configurable size, expanded to 4x (forward + turn_right(90))
+| Command | Parameters | Description |
+|---------|------------|-------------|
+| `turn_left` | `angle` (default: 90), `speed` (default: 0.4) | Rotate left by specified angle |
+| `turn_right` | `angle` (default: 90), `speed` (default: 0.4) | Rotate right by specified angle |
+| `move_forward_for_time` | `duration` (default: 1.0), `speed` (default: 0.4) | Move forward for specified duration |
+| `move_backward_for_time` | `duration` (default: 1.0), `speed` (default: 0.4) | Move backward for specified duration |
+| `make_square` | `side_length` (default: 0.5), `speed` (default: 0.4) | Draw a square pattern |
+| `make_circle` | `radius` (default: 0.5), `speed` (default: 0.4), `direction` (default: "left") | Draw a circular pattern |
+| `make_star` | `size` (default: 0.5), `speed` (default: 0.4) | Draw a star pattern (optional) |
+| `zigzag` | `segment_length` (default: 0.3), `angle` (default: 45), `repetitions` (default: 4), `speed` (default: 0.4) | Perform zigzag movement pattern |
+| `spin` | `duration` (default: 2.0), `speed` (default: 0.5) | Spin in place for specified duration |
+
+### Advanced Commands
+
+| Command | Parameters | Description |
+|---------|------------|-------------|
+| `dance` | None | Perform dance routine |
 
 ## Communication Protocol
 
 Commands are sent from Raspberry Pi to ESP32 as newline-delimited JSON:
 
 ```json
-{"command": "move_forward", "parameters": {"distance": 2.0, "speed": 0.5}, "priority": 0}
+{"command": "move_forward", "parameters": {"speed": 0.4}, "priority": 0}
 ```
 
 ESP32 responds with:
