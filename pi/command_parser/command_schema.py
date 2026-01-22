@@ -8,17 +8,26 @@ from typing import Optional, Dict, Any
 class CommandType(Enum):
     """Types of commands the rover can execute."""
 
-    # Primitive commands
+    # Primitive commands (sent directly to ESP32)
     MOVE_FORWARD = "move_forward"
     MOVE_BACKWARD = "move_backward"
-    TURN_LEFT = "turn_left"
-    TURN_RIGHT = "turn_right"
+    ROTATE_CLOCKWISE = "rotate_clockwise"
+    ROTATE_COUNTERCLOCKWISE = "rotate_counterclockwise"
     STOP = "stop"
 
-    # Intermediate commands
-    TURN_AROUND = "turn_around"
-    CIRCLE = "circle"
-    SQUARE = "square"
+    # Intermediate commands (expanded to primitives on Pi side)
+    TURN_LEFT = "turn_left"
+    TURN_RIGHT = "turn_right"
+    MOVE_FORWARD_FOR_TIME = "move_forward_for_time"
+    MOVE_BACKWARD_FOR_TIME = "move_backward_for_time"
+    MAKE_SQUARE = "make_square"
+    MAKE_CIRCLE = "make_circle"
+    MAKE_STAR = "make_star"
+    ZIGZAG = "zigzag"
+    SPIN = "spin"
+
+    # Advanced commands (expanded to sequences)
+    DANCE = "dance"
 
 
 @dataclass

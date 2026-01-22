@@ -4,13 +4,18 @@ pyserial>=3.5
 # Audio processing
 numpy>=1.24.0
 pyaudio>=0.2.13
+scipy>=1.10.0  # For audio resampling (44.1kHz/48kHz -> 16kHz)
 
 # Wake word detection
 pvporcupine>=3.0.0
+# Note: Requires Porcupine access key (set PORCUPINE_ACCESS_KEY env var)
+# Get key from: https://console.picovoice.ai/
 
 # Speech-to-text
 openai-whisper>=20230314
 torch>=2.0.0
+# Note: Whisper models are downloaded automatically on first use
+# Model sizes: tiny, base, small, medium, large (base recommended for speed)
 
 # Testing
 pytest>=7.4.0

@@ -10,13 +10,13 @@
 class MotorDriver {
 public:
     /**
-     * Initialize motor driver with pin assignments.
+     * Initialize motor driver with pin assignments (BTS7960).
      *
      * @param pwm_pin PWM pin for speed control
-     * @param dir1_pin Direction control pin 1
-     * @param dir2_pin Direction control pin 2
+     * @param r_en_pin Right enable pin (R_EN on BTS7960)
+     * @param l_en_pin Left enable pin (L_EN on BTS7960)
      */
-    MotorDriver(int pwm_pin, int dir1_pin, int dir2_pin);
+    MotorDriver(int pwm_pin, int r_en_pin, int l_en_pin);
 
     /**
      * Initialize motor driver hardware (setup pins, PWM).
@@ -45,10 +45,16 @@ public:
 
 private:
     int pwm_pin_;
-    int dir1_pin_;
-    int dir2_pin_;
+    int r_en_pin_;  // Right enable (forward direction)
+    int l_en_pin_;  // Left enable (reverse direction)
     int current_speed_;
 
+    /**
+     * Set motor direction using BTS7960 enable pins.
+     * Forward: R_EN=HIGH, L_EN=LOW
+     * Reverse: R_EN=LOW, L_EN=HIGH
+     * Stop: R_EN=LOW, L_EN=LOW
+     */
     void setDirection(bool forward);
 };
 

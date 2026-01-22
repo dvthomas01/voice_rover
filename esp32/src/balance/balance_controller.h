@@ -21,11 +21,14 @@ public:
     /**
      * Update the controller with current sensor readings.
      * Must be called at a consistent frequency (e.g., 100Hz).
+     * 
+     * CRITICAL: This function must never be disabled during operation.
      *
      * @param angle Current tilt angle in degrees
      * @param angular_velocity Angular velocity in degrees/sec
+     * @param wheel_velocity Optional wheel velocity from encoders (for feedforward)
      */
-    void update(float angle, float angular_velocity);
+    void update(float angle, float angular_velocity, float wheel_velocity = 0.0);
 
     /**
      * Get the computed motor output.
@@ -35,11 +38,25 @@ public:
     float getMotorOutput();
 
     /**
-     * Set target angle offset for moving forward/backward.
-     *
-     * @param offset Target angle offset in degrees
+     * Set velocity setpoint for forward/backward motion.
+     * Motion commands modify this setpoint, which is added to balance control.
+     * 
+     * @param velocity Target velocity (positive = forward, negative = backward)
      */
-    void setTargetOffset(float offset);
+    void setVelocitySetpoint(float velocity);
+
+    /**
+     * Set rotation setpoint for turning.
+     * 
+     * @param angular_velocity Target angular velocity (positive = clockwise, negative = counterclockwise)
+     */
+    void setRotationSetpoint(float angular_velocity);
+
+    /**
+     * Return to neutral balance (no motion setpoints).
+     * Called by STOP command.
+     */
+    void setNeutral();
 
     /**
      * Reset the controller state (clear integral, error history).
@@ -53,13 +70,36 @@ public:
      */
     bool isBalanced();
 
+    /**
+     * Get current velocity setpoint.
+     * 
+     * @return Velocity setpoint
+     */
+    float getVelocitySetpoint() const;
+
+    /**
+     * Get current rotation setpoint.
+     * 
+     * @return Rotation setpoint
+     */
+    float getRotationSetpoint() const;
+
 private:
     float kp_, ki_, kd_;
     float integral_;
     float previous_error_;
-    float target_offset_;
     float motor_output_;
     unsigned long last_update_time_;
+    
+    // Motion setpoints (modify balance, don't replace it)
+    float velocity_setpoint_;     // Forward/backward velocity
+    float rotation_setpoint_;     // Rotation angular velocity
+    
+    // PID calculation
+    float calculatePID(float angle, float angular_velocity);
+    
+    // Integral windup protection
+    void limitIntegral();
 };
 
 #endif // BALANCE_CONTROLLER_H

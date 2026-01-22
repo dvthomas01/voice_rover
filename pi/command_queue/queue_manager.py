@@ -28,8 +28,20 @@ class CommandQueueManager:
 
         Returns:
             True if successfully enqueued, False if queue is full
+            
+        TODO: Add command to priority queue
+        TODO: Use negative priority (PriorityQueue is min-heap, we want max priority first)
+        TODO: Thread-safe operation
         """
-        raise NotImplementedError("To be implemented")
+        # TODO: Implement enqueue
+        # PriorityQueue uses min-heap, so use negative priority for max priority first
+        # try:
+        #     self._queue.put((-command.priority, id(command), command), block=False)
+        #     return True
+        # except queue.Full:
+        #     return False
+        
+        return False
 
     def dequeue(self, timeout: Optional[float] = None) -> Optional[Command]:
         """Remove and return highest priority command from queue.
@@ -39,28 +51,57 @@ class CommandQueueManager:
 
         Returns:
             Next command, or None if timeout reached
+            
+        TODO: Get command from priority queue
+        TODO: Handle timeout
+        TODO: Thread-safe operation
         """
-        raise NotImplementedError("To be implemented")
+        # TODO: Implement dequeue
+        # try:
+        #     priority, _, command = self._queue.get(timeout=timeout)
+        #     return command
+        # except queue.Empty:
+        #     return None
+        
+        return None
 
     def clear(self) -> None:
         """Clear all commands from queue.
 
         CRITICAL: This must be called when STOP command is received.
+        
+        TODO: Clear all items from queue
+        TODO: Thread-safe operation
         """
-        raise NotImplementedError("To be implemented")
+        # TODO: Implement clear
+        # with self._lock:
+        #     while not self._queue.empty():
+        #         try:
+        #             self._queue.get_nowait()
+        #         except queue.Empty:
+        #             break
+        pass
 
     def is_empty(self) -> bool:
         """Check if queue is empty.
 
         Returns:
             True if queue is empty
+            
+        TODO: Check if queue is empty
         """
-        raise NotImplementedError("To be implemented")
+        # TODO: Implement
+        # return self._queue.empty()
+        return True
 
     def size(self) -> int:
         """Get current queue size.
 
         Returns:
             Number of commands in queue
+            
+        TODO: Get queue size
         """
-        raise NotImplementedError("To be implemented")
+        # TODO: Implement
+        # return self._queue.qsize()
+        return 0
