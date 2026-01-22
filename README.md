@@ -1,6 +1,6 @@
 # Voice Rover
 
-A voice-controlled self-balancing robot built on a two-tier architecture combining Raspberry Pi for natural language processing and ESP32 for real-time balance control. The system accepts spoken commands through a wake word interface, processes them using Whisper speech-to-text, and executes movement commands while maintaining balance.
+A voice-controlled differential drive robot built on a two-tier architecture combining Raspberry Pi for natural language processing and ESP32 for motor control. The system accepts spoken commands through a wake word interface, processes them using Whisper speech-to-text, and executes movement commands on a static differential drive chassis.
 
 ## System Architecture
 
@@ -14,24 +14,22 @@ Voice Rover uses a distributed architecture to separate high-level cognitive tas
 - USB serial communication to ESP32
 
 **ESP32 Tier**
-- Real-time PID-based balance control
-- Motor driver management
-- IMU sensor processing
+- Motor driver management (BTS7960)
+- Encoder reading and feedback
 - Command execution
 - Safety fail-safes
 
-The two tiers communicate via USB serial using a newline-delimited JSON protocol. This separation allows the computationally intensive speech processing to run on the Pi without interfering with the time-critical balance control loop running on the ESP32.
+The two tiers communicate via USB serial using a newline-delimited JSON protocol. This separation allows the computationally intensive speech processing to run on the Pi without interfering with motor control on the ESP32.
 
 ## Hardware Requirements
 
 ### Core Components
-- **Raspberry Pi 4** (2GB+ RAM recommended)
+- **Raspberry Pi 4** (2GB or more)
 - **ESP32 development board** (ESP32-DevKitC or similar)
-- **USB microphone** or I2S MEMS microphone
-- **IMU sensor** (MPU6050 or MPU9250)
-- **Motor drivers** (L298N, DRV8833, or similar H-bridge)
-- **DC motors** (2x, with encoders recommended)
-- **Self-balancing chassis** (two-wheeled design)
+- **USB microphone** (Samson Go Mic USB confirmed)
+- **Motor driver** (BTS7960)
+- **DC motors with encoders** (Dagu RS034 Motor and Encoder Kit confirmed)
+- **Differential drive chassis** (static, non-balancing)
 
 ### Power Requirements
 - 7.4V-12V LiPo battery for motors (2S-3S)
@@ -39,10 +37,11 @@ The two tiers communicate via USB serial using a newline-delimited JSON protocol
 - 3.3V for ESP32 (typically from USB or onboard regulator)
 
 ### Connections
-- USB cable: Raspberry Pi to ESP32 (data + power)
-- I2C: ESP32 to IMU (SDA/SCL)
-- PWM + GPIO: ESP32 to motor drivers
-- Audio: USB microphone to Raspberry Pi
+- **USB serial**: Raspberry Pi to ESP32 (data + power)
+- **PWM and GPIO**: ESP32 to motor drivers (BTS7960)
+- **Encoder signals**: Motors to ESP32
+- **Audio**: USB microphone to Raspberry Pi
+- **Power**: LiPo battery to motor driver and regulators
 
 ## Software Requirements
 
@@ -215,8 +214,8 @@ voice_rover/
 │   └── config.py          # Configuration
 ├── esp32/                 # ESP32 firmware
 │   ├── src/
-│   │   ├── balance/       # PID balance controller
-│   │   ├── motor_control/ # Motor drivers
+│   │   ├── motor_control/ # Motor driver control (BTS7960)
+│   │   ├── encoder/       # Encoder reading
 │   │   └── command_handler/ # Command parser
 │   └── include/config.h   # ESP32 configuration
 ├── tests/                 # Test suites
@@ -238,14 +237,14 @@ voice_rover/
    - Add case in `executeMovementCommand()`
    - Implement motor control logic
 
-### Modifying Balance Parameters
+### Modifying Motor Control Parameters
 
 Edit `esp32/include/config.h`:
-- `KP`, `KI`, `KD`: PID gains
-- `BALANCE_ANGLE_OFFSET`: Target angle for balance
-- `BALANCE_LOOP_FREQ`: Control loop frequency (Hz)
+- Motor PWM pins and direction pins
+- Encoder pins
+- Speed limits and acceleration parameters
 
-Tune parameters iteratively. Start with KP, then add KD, finally KI.
+Adjust motor speeds and encoder calibration as needed for your chassis.
 
 ### Testing Individual Modules
 
@@ -259,9 +258,9 @@ ESP32 firmware can be tested with serial loopback or mock serial port.
 ## Safety Features
 
 - **STOP command priority**: STOP always clears the queue and executes immediately
-- **Balance fail-safe**: ESP32 monitors tilt angle; motors stop if angle exceeds safe threshold
-- **Serial timeout**: If serial connection lost, ESP32 enters safe mode
+- **Serial timeout**: If serial connection lost, ESP32 enters safe mode (stops motors)
 - **Command validation**: All JSON commands validated before execution
+- **Encoder feedback**: Encoders provide position/speed feedback for safe operation
 
 ## Troubleshooting
 
@@ -275,11 +274,11 @@ ESP32 firmware can be tested with serial loopback or mock serial port.
 - Monitor ESP32 serial output: `pio device monitor`
 - Verify ESP32 firmware uploaded successfully
 
-### Robot not balancing
-- Calibrate IMU sensor
-- Tune PID parameters in `esp32/include/config.h`
+### Robot not moving correctly
 - Check motor connections and directions
-- Verify IMU orientation matches code expectations
+- Verify encoder connections and calibration
+- Check motor driver (BTS7960) power and control signals
+- Verify encoder pulses are being read correctly
 
 ### Serial communication errors
 - Ensure baud rate matches on both Pi and ESP32 (115200)
@@ -296,11 +295,13 @@ This repository contains a complete modular skeleton with clear interfaces and t
 - Wake word detection integration
 - Whisper transcription
 - Command parsing logic
-- PID balance controller
-- Motor control implementation
-- IMU sensor integration
+- Motor control implementation (BTS7960 driver)
+- Encoder reading and feedback
+- Command execution on ESP32
 
 The architecture and interfaces are stable. Development can proceed in parallel on Pi and ESP32 codebases.
+
+**Note**: The codebase includes a balance controller module from initial planning, but this project uses a static differential drive chassis and does not require balance control or IMU sensors.
 
 ## License
 
