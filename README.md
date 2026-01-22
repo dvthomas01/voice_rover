@@ -1,6 +1,6 @@
 # Voice Rover
 
-A voice-controlled differential drive robot built on a two-tier architecture combining Raspberry Pi for natural language processing and ESP32 for motor control. The system accepts spoken commands through a wake word interface, processes them using Whisper speech-to-text, and executes movement commands on a static differential drive chassis.
+A voice-controlled self-balancing inverted pendulum robot built on a two-tier architecture combining Raspberry Pi for natural language processing and ESP32 for real-time balance control. The system accepts spoken commands through a wake word interface, processes them using Whisper speech-to-text, and executes movement commands while continuously maintaining balance using an onboard IMU and motor encoders.
 
 ## System Architecture
 
@@ -14,12 +14,14 @@ Voice Rover uses a distributed architecture to separate high-level cognitive tas
 - USB serial communication to ESP32
 
 **ESP32 Tier**
+- Real-time PID-based balance control (100Hz loop)
+- IMU sensor processing (MPU6050)
 - Motor driver management (BTS7960)
 - Encoder reading and feedback
 - Command execution
 - Safety fail-safes
 
-The two tiers communicate via USB serial using a newline-delimited JSON protocol. This separation allows the computationally intensive speech processing to run on the Pi without interfering with motor control on the ESP32.
+The two tiers communicate via USB serial using a newline-delimited JSON protocol. This separation allows the computationally intensive speech processing to run on the Pi without interfering with the time-critical balance control loop running on the ESP32.
 
 ## Hardware Requirements
 
@@ -27,21 +29,24 @@ The two tiers communicate via USB serial using a newline-delimited JSON protocol
 - **Raspberry Pi 4** (2GB or more)
 - **ESP32 development board** (ESP32-DevKitC or similar)
 - **USB microphone** (Samson Go Mic USB confirmed)
+- **IMU sensor** (MPU6050) - Required for balance control
 - **Motor driver** (BTS7960)
 - **DC motors with encoders** (Dagu RS034 Motor and Encoder Kit confirmed)
-- **Differential drive chassis** (static, non-balancing)
+- **Self-balancing chassis** (two-wheeled inverted pendulum)
 
 ### Power Requirements
-- 7.4V-12V LiPo battery for motors (2S-3S)
-- 5V power supply for Raspberry Pi (separate or buck converter)
+- 2-cell LiPo battery (7.4V) for motors and logic power
+- Buck converter for stepping down battery voltage to logic levels
+- 5V power supply for Raspberry Pi (separate or from buck converter)
 - 3.3V for ESP32 (typically from USB or onboard regulator)
 
 ### Connections
 - **USB serial**: Raspberry Pi to ESP32 (data + power)
+- **I2C**: ESP32 to IMU (SDA/SCL) - Required for balance control
 - **PWM and GPIO**: ESP32 to motor drivers (BTS7960)
 - **Encoder signals**: Motors to ESP32
 - **Audio**: USB microphone to Raspberry Pi
-- **Power**: LiPo battery to motor driver and regulators
+- **Power**: 2-cell LiPo battery to motor driver and regulators
 
 ## Software Requirements
 
@@ -214,8 +219,9 @@ voice_rover/
 │   └── config.py          # Configuration
 ├── esp32/                 # ESP32 firmware
 │   ├── src/
+│   │   ├── sensors/       # IMU and encoder modules
+│   │   ├── balance/       # PID balance controller
 │   │   ├── motor_control/ # Motor driver control (BTS7960)
-│   │   ├── encoder/       # Encoder reading
 │   │   └── command_handler/ # Command parser
 │   └── include/config.h   # ESP32 configuration
 ├── tests/                 # Test suites
@@ -258,9 +264,11 @@ ESP32 firmware can be tested with serial loopback or mock serial port.
 ## Safety Features
 
 - **STOP command priority**: STOP always clears the queue and executes immediately
-- **Serial timeout**: If serial connection lost, ESP32 enters safe mode (stops motors)
+- **Balance loop continuity**: Balance control runs continuously at 100Hz and is never disabled
+- **Fall detection**: ESP32 monitors tilt angle; motors stop if angle exceeds safe threshold
+- **Serial timeout**: If serial connection lost, ESP32 enters safe mode (returns to neutral balance)
 - **Command validation**: All JSON commands validated before execution
-- **Encoder feedback**: Encoders provide position/speed feedback for safe operation
+- **Motion integration**: Motion commands modify balance setpoints, don't replace balance control
 
 ## Troubleshooting
 
@@ -274,11 +282,19 @@ ESP32 firmware can be tested with serial loopback or mock serial port.
 - Monitor ESP32 serial output: `pio device monitor`
 - Verify ESP32 firmware uploaded successfully
 
+### Robot not balancing
+- Calibrate IMU sensor on level surface
+- Tune PID parameters in `esp32/include/config.h` (start with KP, add KD, finally KI)
+- Check motor connections and directions
+- Verify IMU orientation matches code expectations
+- Check that balance loop is running at 100Hz
+
 ### Robot not moving correctly
 - Check motor connections and directions
 - Verify encoder connections and calibration
 - Check motor driver (BTS7960) power and control signals
 - Verify encoder pulses are being read correctly
+- Ensure motion commands are modifying balance setpoints correctly
 
 ### Serial communication errors
 - Ensure baud rate matches on both Pi and ESP32 (115200)
@@ -295,13 +311,19 @@ This repository contains a complete modular skeleton with clear interfaces and t
 - Wake word detection integration
 - Whisper transcription
 - Command parsing logic
+- PID balance controller implementation
+- IMU sensor integration (MPU6050)
 - Motor control implementation (BTS7960 driver)
 - Encoder reading and feedback
 - Command execution on ESP32
 
 The architecture and interfaces are stable. Development can proceed in parallel on Pi and ESP32 codebases.
 
-**Note**: The codebase includes a balance controller module from initial planning, but this project uses a static differential drive chassis and does not require balance control or IMU sensors.
+**Key Architecture Points**:
+- Balance control is the PRIMARY function - runs continuously at 100Hz
+- Motion commands modify balance controller setpoints (don't replace control)
+- IMU (MPU6050) is required for pitch angle estimation
+- Balance loop is never disabled during operation (safety critical)
 
 ## License
 
