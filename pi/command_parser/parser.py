@@ -190,6 +190,18 @@ class CommandParser:
                     best_end = turn_counterclockwise_with_angle.end()
                     angle_match_info = ("counterclockwise", float(turn_counterclockwise_with_angle.group(1)))
 
+            turn_with_angle_no_direction = re.search(
+                r"(?:turn|rotate)(?!\s+(?:clockwise|counter\s*clockwise|left|right))\s+(\d+(?:\.\d+)?)\s*degrees?",
+                remaining_text,
+                re.IGNORECASE
+            )
+            if turn_with_angle_no_direction and turn_with_angle_no_direction.group(1):
+                if turn_with_angle_no_direction.start() < best_start:
+                    best_match = (CommandType.ROTATE_COUNTERCLOCKWISE, turn_with_angle_no_direction)
+                    best_start = turn_with_angle_no_direction.start()
+                    best_end = turn_with_angle_no_direction.end()
+                    angle_match_info = ("counterclockwise", float(turn_with_angle_no_direction.group(1)))
+
             for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
                             CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
                             CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE, 
