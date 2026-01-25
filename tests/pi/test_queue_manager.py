@@ -91,14 +91,12 @@ class TestCommandQueueManager:
 
     def test_thread_safety_enqueue(self):
         """Test thread-safe enqueue operations."""
-        commands = [
-            Command(CommandType.MOVE_FORWARD, {"speed": 0.4}, PRIORITY_NORMAL)
-            for _ in range(10)
-        ]
+        queue = CommandQueueManager(max_size=50)
         
         def enqueue_commands():
-            for cmd in commands:
-                self.queue.enqueue(cmd)
+            for _ in range(10):
+                cmd = Command(CommandType.MOVE_FORWARD, {"speed": 0.4}, PRIORITY_NORMAL)
+                queue.enqueue(cmd)
         
         threads = [threading.Thread(target=enqueue_commands) for _ in range(3)]
         for t in threads:
@@ -106,7 +104,7 @@ class TestCommandQueueManager:
         for t in threads:
             t.join()
         
-        assert self.queue.size() == 30
+        assert queue.size() == 30
 
     def test_thread_safety_dequeue(self):
         """Test thread-safe dequeue operations."""

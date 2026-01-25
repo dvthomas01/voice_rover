@@ -18,6 +18,8 @@ class CommandQueueManager:
         self.max_size = max_size
         self._queue = queue.PriorityQueue(maxsize=max_size)
         self._lock = threading.Lock()
+        self._sequence_counter = 0
+        self._sequence_lock = threading.Lock()
 
     def enqueue(self, command: Command) -> bool:
         """Add command to queue.
@@ -33,7 +35,10 @@ class CommandQueueManager:
                 return False
             
             try:
-                priority_tuple = (-command.priority, id(command), command)
+                with self._sequence_lock:
+                    sequence = self._sequence_counter
+                    self._sequence_counter += 1
+                priority_tuple = (-command.priority, sequence, command)
                 self._queue.put(priority_tuple, block=False)
                 return True
             except queue.Full:
