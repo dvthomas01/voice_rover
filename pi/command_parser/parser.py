@@ -1,9 +1,4 @@
-"""Natural language to structured command parser.
-
-INTEGRATION POINT: Main controller uses parse() after Whisper transcription
-FUNCTIONALITY: Pattern matching to convert text to Command objects
-INTERMEDIATE COMMANDS: Expanded to sequences of primitive commands on Pi side
-"""
+"""Natural language to structured command parser."""
 
 import re
 from typing import Dict, List, Optional, Any
@@ -13,208 +8,352 @@ from .command_schema import Command, CommandType, PRIORITY_STOP, PRIORITY_NORMAL
 class CommandParser:
     """Parses natural language into structured commands."""
 
+    DEFAULT_SPEED = 0.4
+    DEFAULT_ANGLE = 90.0
+    DEFAULT_DURATION = 1.0
+    DEFAULT_SIDE_LENGTH = 0.5
+    DEFAULT_RADIUS = 0.5
+    DEFAULT_STAR_SIZE = 0.5
+    DEFAULT_SEGMENT_LENGTH = 0.3
+    DEFAULT_ZIGZAG_ANGLE = 45.0
+    DEFAULT_ZIGZAG_REPETITIONS = 4
+    DEFAULT_SPIN_DURATION = 2.0
+    DEFAULT_SPIN_SPEED = 0.5
+
+    SPEED_MODIFIERS = {
+        "fast": 0.7,
+        "slow": 0.2,
+        "slowly": 0.2,
+        "a bit faster": 0.6,
+        "a bit slower": 0.3,
+        "very fast": 0.9,
+        "very slow": 0.15,
+    }
+
     def __init__(self):
         """Initialize command parser."""
-        self._command_patterns = {}
-        self._initialize_patterns()
+        self._synonyms = self._build_synonym_patterns()
+        self._transition_words = ["then", "and", "then move", "then turn"]
 
-    def _initialize_patterns(self) -> None:
-        """Initialize command pattern matching.
-        
-        TODO: Register regex patterns for all commands
-        """
-        # TODO: Register patterns for primitive commands
-        # self._command_patterns[CommandType.MOVE_FORWARD] = [
-        #     r"move\s+forward",
-        #     r"go\s+forward",
-        #     r"forward"
-        # ]
-        # 
-        # self._command_patterns[CommandType.MOVE_BACKWARD] = [
-        #     r"move\s+backward",
-        #     r"go\s+backward",
-        #     r"backward",
-        #     r"back\s+up"
-        # ]
-        # 
-        # self._command_patterns[CommandType.ROTATE_CLOCKWISE] = [
-        #     r"rotate\s+clockwise",
-        #     r"turn\s+right",
-        #     r"spin\s+right"
-        # ]
-        # 
-        # self._command_patterns[CommandType.ROTATE_COUNTERCLOCKWISE] = [
-        #     r"rotate\s+counterclockwise",
-        #     r"turn\s+left",
-        #     r"spin\s+left"
-        # ]
-        # 
-        # self._command_patterns[CommandType.STOP] = [
-        #     r"stop",
-        #     r"halt",
-        #     r"emergency\s+stop"
-        # ]
-        pass
+    def _build_synonym_patterns(self) -> Dict[CommandType, List[str]]:
+        """Build regex patterns for all command synonyms."""
+        return {
+            CommandType.MOVE_FORWARD: [
+                r"move\s+forward",
+                r"go\s+forward",
+                r"forward",
+                r"move\s+ahead",
+                r"go\s+ahead",
+            ],
+            CommandType.MOVE_BACKWARD: [
+                r"move\s+backward",
+                r"go\s+backward",
+                r"backward",
+                r"back\s+up",
+                r"reverse",
+            ],
+            CommandType.ROTATE_CLOCKWISE: [
+                r"rotate\s+clockwise",
+                r"spin\s+right",
+                r"rotate\s+right",
+            ],
+            CommandType.ROTATE_COUNTERCLOCKWISE: [
+                r"rotate\s+counterclockwise",
+                r"spin\s+left",
+                r"rotate\s+left",
+            ],
+            CommandType.STOP: [
+                r"stop",
+                r"halt",
+                r"emergency\s+stop",
+                r"cease",
+            ],
+            CommandType.TURN_LEFT: [
+                r"turn\s+left",
+                r"move\s+left",
+            ],
+            CommandType.TURN_RIGHT: [
+                r"turn\s+right",
+                r"move\s+right",
+            ],
+            CommandType.MOVE_FORWARD_FOR_TIME: [
+                r"move\s+forward\s+for",
+                r"go\s+forward\s+for",
+            ],
+            CommandType.MOVE_BACKWARD_FOR_TIME: [
+                r"move\s+backward\s+for",
+                r"go\s+backward\s+for",
+            ],
+            CommandType.MAKE_SQUARE: [
+                r"make\s+a?\s*square",
+                r"create\s+a?\s*square",
+            ],
+            CommandType.MAKE_CIRCLE: [
+                r"make\s+a?\s*circle",
+                r"create\s+a?\s*circle",
+            ],
+            CommandType.MAKE_STAR: [
+                r"make\s+a?\s*star",
+                r"create\s+a?\s*star",
+            ],
+            CommandType.ZIGZAG: [
+                r"zigzag",
+                r"zig\s+zag",
+            ],
+            CommandType.SPIN: [
+                r"spin",
+            ],
+            CommandType.DANCE: [
+                r"dance",
+            ],
+        }
 
     def parse(self, text: str) -> Optional[List[Command]]:
         """Parse natural language text into commands.
 
         Args:
-            text: Natural language command text (lowercase, trimmed)
+            text: Natural language command text
 
         Returns:
             List of Command objects, or None if parsing fails
-            
-        TODO: Try to parse as primitive command first
-        TODO: If not primitive, try intermediate command
-        TODO: Return list of commands (intermediate expands to primitives)
         """
+        if not text or not text.strip():
+            return None
+
         text = text.strip().lower()
+        text = self._remove_wake_word(text)
         
-        # TODO: Try primitive commands first
-        # primitive = self.parse_primitive(text)
-        # if primitive:
-        #     return [primitive]
-        # 
-        # # TODO: Try intermediate commands
-        # intermediate = self.parse_intermediate(text)
-        # if intermediate:
-        #     return intermediate
+        if not text:
+            return None
+
+        segments = self._split_commands(text)
+        commands = []
+
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
+
+            cmd = self._parse_single_command(segment)
+            if cmd:
+                if isinstance(cmd, list):
+                    commands.extend(cmd)
+                else:
+                    commands.append(cmd)
+
+        return commands if commands else None
+
+    def _remove_wake_word(self, text: str) -> str:
+        """Remove wake word from text if present."""
+        text = re.sub(r"^jarvis\s*,?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"^hey\s+jarvis\s*,?\s*", "", text, flags=re.IGNORECASE)
+        return text.strip()
+
+    def _split_commands(self, text: str) -> List[str]:
+        """Split text into individual command segments."""
+        segments = re.split(r",\s*", text)
         
-        return None
-
-    def parse_primitive(self, text: str) -> Optional[Command]:
-        """Parse text into a single primitive command.
-
-        Args:
-            text: Command text
-
-        Returns:
-            Single Command object, or None if parsing fails
+        new_segments = []
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
             
-        TODO: Match text against primitive command patterns
-        TODO: Extract parameters (speed, etc.)
-        TODO: Return Command object
-        """
-        # TODO: Match patterns
-        # if re.search(r"move\s+forward|go\s+forward|forward", text):
-        #     speed = self._extract_speed(text, default=0.4)
-        #     return Command(
-        #         CommandType.MOVE_FORWARD,
-        #         {"speed": speed},
-        #         PRIORITY_NORMAL
-        #     )
-        # 
-        # if re.search(r"move\s+backward|go\s+backward|backward|back\s+up", text):
-        #     speed = self._extract_speed(text, default=0.4)
-        #     return Command(
-        #         CommandType.MOVE_BACKWARD,
-        #         {"speed": speed},
-        #         PRIORITY_NORMAL
-        #     )
-        # 
-        # if re.search(r"rotate\s+clockwise|turn\s+right|spin\s+right", text):
-        #     speed = self._extract_speed(text, default=0.4)
-        #     return Command(
-        #         CommandType.ROTATE_CLOCKWISE,
-        #         {"speed": speed},
-        #         PRIORITY_NORMAL
-        #     )
-        # 
-        # if re.search(r"rotate\s+counterclockwise|turn\s+left|spin\s+left", text):
-        #     speed = self._extract_speed(text, default=0.4)
-        #     return Command(
-        #         CommandType.ROTATE_COUNTERCLOCKWISE,
-        #         {"speed": speed},
-        #         PRIORITY_NORMAL
-        #     )
-        # 
-        # if re.search(r"stop|halt|emergency\s+stop", text):
-        #     return Command(
-        #         CommandType.STOP,
-        #         {},
-        #         PRIORITY_STOP
-        #     )
+            for transition in self._transition_words:
+                if re.search(rf"\b{re.escape(transition)}\b", segment, re.IGNORECASE):
+                    parts = re.split(rf"\b{re.escape(transition)}\b", segment, flags=re.IGNORECASE)
+                    new_segments.extend([p.strip() for p in parts if p.strip()])
+                    break
+            else:
+                new_segments.append(segment)
         
+        return new_segments if new_segments else [text]
+
+    def _parse_single_command(self, text: str) -> Optional[Command]:
+        """Parse a single command segment."""
+        text = text.strip()
+        if not text:
+            return None
+
+        cmd = self._parse_intermediate(text)
+        if cmd:
+            return cmd
+
+        cmd = self._parse_primitive(text)
+        if cmd:
+            return cmd
+
         return None
 
-    def parse_intermediate(self, text: str) -> Optional[List[Command]]:
-        """Parse intermediate command into list of primitive commands.
+    def _parse_primitive(self, text: str) -> Optional[Command]:
+        """Parse primitive command."""
+        speed = self._extract_speed(text, self.DEFAULT_SPEED)
 
-        Args:
-            text: Intermediate command text
+        if self._matches_pattern(text, CommandType.MOVE_FORWARD):
+            return Command(
+                CommandType.MOVE_FORWARD,
+                {"speed": speed},
+                PRIORITY_NORMAL
+            )
 
-        Returns:
-            List of primitive Command objects
-            
-        TODO: Match intermediate command patterns
-        TODO: Extract parameters (angle, duration, side_length, etc.)
-        TODO: Expand to sequence of primitive commands
-        """
-        # TODO: Turn left/right with angle
-        # match = re.search(r"turn\s+left\s+(\d+)\s*degrees?", text)
-        # if match:
-        #     angle = float(match.group(1))
-        #     speed = self._extract_speed(text, default=0.4)
-        #     # Expand to rotate_counterclockwise for angle duration
-        #     return [Command(CommandType.ROTATE_COUNTERCLOCKWISE, {"speed": speed, "angle": angle})]
-        # 
-        # # TODO: Move forward/backward for time
-        # match = re.search(r"move\s+forward\s+for\s+(\d+(?:\.\d+)?)\s*seconds?", text)
-        # if match:
-        #     duration = float(match.group(1))
-        #     speed = self._extract_speed(text, default=0.4)
-        #     return [Command(CommandType.MOVE_FORWARD, {"speed": speed, "duration": duration})]
-        # 
-        # # TODO: Make square
-        # if re.search(r"make\s+a?\s*square", text):
-        #     side_length = self._extract_number(text, "side", default=0.5)
-        #     speed = self._extract_speed(text, default=0.4)
-        #     # Expand to: forward, turn right 90, forward, turn right 90, etc.
-        #     commands = []
-        #     for _ in range(4):
-        #         commands.append(Command(CommandType.MOVE_FORWARD, {"speed": speed, "duration": side_length / speed}))
-        #         commands.append(Command(CommandType.ROTATE_CLOCKWISE, {"speed": speed, "angle": 90}))
-        #     return commands
-        # 
-        # # TODO: Make circle, star, zigzag, spin, dance
-        # # Similar pattern matching and expansion
-        
+        if self._matches_pattern(text, CommandType.MOVE_BACKWARD):
+            return Command(
+                CommandType.MOVE_BACKWARD,
+                {"speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.ROTATE_CLOCKWISE):
+            return Command(
+                CommandType.ROTATE_CLOCKWISE,
+                {"speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.ROTATE_COUNTERCLOCKWISE):
+            return Command(
+                CommandType.ROTATE_COUNTERCLOCKWISE,
+                {"speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.STOP):
+            return Command(
+                CommandType.STOP,
+                {},
+                PRIORITY_STOP
+            )
+
         return None
 
-    def _extract_speed(self, text: str, default: float = 0.4) -> float:
-        """Extract speed parameter from text.
-        
-        TODO: Find speed value in text (e.g., "at 0.5 speed", "speed 0.6")
-        """
-        # TODO: Extract speed
-        # match = re.search(r"speed\s*[:\s]*(\d+\.?\d*)", text)
-        # if match:
-        #     return float(match.group(1))
+    def _parse_intermediate(self, text: str) -> Optional[Command]:
+        """Parse intermediate command."""
+        speed = self._extract_speed(text, self.DEFAULT_SPEED)
+
+        turn_left_match = re.search(r"(?:turn|move)\s+left(?:\s+(\d+(?:\.\d+)?)\s*degrees?)?", text)
+        if turn_left_match:
+            angle = float(turn_left_match.group(1)) if turn_left_match.group(1) else self.DEFAULT_ANGLE
+            return Command(
+                CommandType.TURN_LEFT,
+                {"angle": angle, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        turn_right_match = re.search(r"(?:turn|move)\s+right(?:\s+(\d+(?:\.\d+)?)\s*degrees?)?", text)
+        if turn_right_match:
+            angle = float(turn_right_match.group(1)) if turn_right_match.group(1) else self.DEFAULT_ANGLE
+            return Command(
+                CommandType.TURN_RIGHT,
+                {"angle": angle, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        forward_time_match = re.search(
+            r"(?:move|go)\s+forward\s+for\s+(\d+(?:\.\d+)?)\s*seconds?",
+            text
+        )
+        if forward_time_match:
+            duration = float(forward_time_match.group(1))
+            return Command(
+                CommandType.MOVE_FORWARD_FOR_TIME,
+                {"duration": duration, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        backward_time_match = re.search(
+            r"(?:move|go)\s+backward\s+for\s+(\d+(?:\.\d+)?)\s*seconds?",
+            text
+        )
+        if backward_time_match:
+            duration = float(backward_time_match.group(1))
+            return Command(
+                CommandType.MOVE_BACKWARD_FOR_TIME,
+                {"duration": duration, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.MAKE_SQUARE):
+            side_length = self._extract_number(text, "side", self.DEFAULT_SIDE_LENGTH)
+            return Command(
+                CommandType.MAKE_SQUARE,
+                {"side_length": side_length, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.MAKE_CIRCLE):
+            radius = self._extract_number(text, "radius", self.DEFAULT_RADIUS)
+            direction_match = re.search(r"(left|right|counterclockwise|clockwise)", text)
+            direction = "left" if direction_match and direction_match.group(1) in ["left", "counterclockwise"] else "left"
+            if direction_match and direction_match.group(1) in ["right", "clockwise"]:
+                direction = "right"
+            return Command(
+                CommandType.MAKE_CIRCLE,
+                {"radius": radius, "speed": speed, "direction": direction},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.MAKE_STAR):
+            size = self._extract_number(text, "size", self.DEFAULT_STAR_SIZE)
+            return Command(
+                CommandType.MAKE_STAR,
+                {"size": size, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.ZIGZAG):
+            segment_length = self._extract_number(text, "segment", self.DEFAULT_SEGMENT_LENGTH)
+            angle = self._extract_number(text, "angle", self.DEFAULT_ZIGZAG_ANGLE)
+            repetitions = int(self._extract_number(text, "repetitions", self.DEFAULT_ZIGZAG_REPETITIONS))
+            return Command(
+                CommandType.ZIGZAG,
+                {"segment_length": segment_length, "angle": angle, "repetitions": repetitions, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.SPIN):
+            duration_match = re.search(r"for\s+(\d+(?:\.\d+)?)\s*seconds?", text)
+            duration = float(duration_match.group(1)) if duration_match else self.DEFAULT_SPIN_DURATION
+            spin_speed = self._extract_speed(text, self.DEFAULT_SPIN_SPEED)
+            return Command(
+                CommandType.SPIN,
+                {"duration": duration, "speed": spin_speed},
+                PRIORITY_NORMAL
+            )
+
+        if self._matches_pattern(text, CommandType.DANCE):
+            return Command(
+                CommandType.DANCE,
+                {},
+                PRIORITY_NORMAL
+            )
+
+        return None
+
+    def _matches_pattern(self, text: str, command_type: CommandType) -> bool:
+        """Check if text matches any pattern for command type."""
+        patterns = self._synonyms.get(command_type, [])
+        for pattern in patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        return False
+
+    def _extract_speed(self, text: str, default: float = DEFAULT_SPEED) -> float:
+        """Extract speed parameter from text."""
+        explicit_match = re.search(r"(?:at\s+)?speed\s*[:\s]*(\d+\.?\d*)", text)
+        if explicit_match:
+            speed = float(explicit_match.group(1))
+            return max(0.0, min(1.0, speed))
+
+        for modifier, value in self.SPEED_MODIFIERS.items():
+            if re.search(rf"\b{re.escape(modifier)}\b", text, re.IGNORECASE):
+                return value
+
         return default
 
     def _extract_number(self, text: str, keyword: str, default: float) -> float:
-        """Extract number parameter from text.
-        
-        TODO: Find number after keyword (e.g., "side 0.5", "angle 90")
-        """
-        # TODO: Extract number
-        # match = re.search(rf"{keyword}\s*[:\s]*(\d+\.?\d*)", text)
-        # if match:
-        #     return float(match.group(1))
+        """Extract number parameter from text."""
+        pattern = rf"{re.escape(keyword)}\s*[:\s]*(\d+\.?\d*)"
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return float(match.group(1))
         return default
-
-    def register_pattern(self, pattern: str, command_type: CommandType) -> None:
-        """Register a new command pattern.
-
-        Args:
-            pattern: Regex pattern to match
-            command_type: Type of command this pattern represents
-            
-        TODO: Add pattern to command_patterns dictionary
-        """
-        # TODO: Register pattern
-        # if command_type not in self._command_patterns:
-        #     self._command_patterns[command_type] = []
-        # self._command_patterns[command_type].append(pattern)
-        pass

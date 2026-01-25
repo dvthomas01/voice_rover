@@ -1,7 +1,7 @@
 """Thread-safe command queue with priority handling."""
 
 from typing import Optional
-from queue import PriorityQueue
+import queue
 import threading
 from ..command_parser.command_schema import Command, PRIORITY_STOP
 
@@ -16,9 +16,8 @@ class CommandQueueManager:
             max_size: Maximum queue size
         """
         self.max_size = max_size
-        self._queue = PriorityQueue(maxsize=max_size)
+        self._queue = queue.PriorityQueue(maxsize=max_size)
         self._lock = threading.Lock()
-        self._stop_event = threading.Event()
 
     def enqueue(self, command: Command) -> bool:
         """Add command to queue.
@@ -28,20 +27,17 @@ class CommandQueueManager:
 
         Returns:
             True if successfully enqueued, False if queue is full
-            
-        TODO: Add command to priority queue
-        TODO: Use negative priority (PriorityQueue is min-heap, we want max priority first)
-        TODO: Thread-safe operation
         """
-        # TODO: Implement enqueue
-        # PriorityQueue uses min-heap, so use negative priority for max priority first
-        # try:
-        #     self._queue.put((-command.priority, id(command), command), block=False)
-        #     return True
-        # except queue.Full:
-        #     return False
-        
-        return False
+        with self._lock:
+            if self._queue.full():
+                return False
+            
+            try:
+                priority_tuple = (-command.priority, id(command), command)
+                self._queue.put(priority_tuple, block=False)
+                return True
+            except queue.Full:
+                return False
 
     def dequeue(self, timeout: Optional[float] = None) -> Optional[Command]:
         """Remove and return highest priority command from queue.
@@ -51,57 +47,37 @@ class CommandQueueManager:
 
         Returns:
             Next command, or None if timeout reached
-            
-        TODO: Get command from priority queue
-        TODO: Handle timeout
-        TODO: Thread-safe operation
         """
-        # TODO: Implement dequeue
-        # try:
-        #     priority, _, command = self._queue.get(timeout=timeout)
-        #     return command
-        # except queue.Empty:
-        #     return None
-        
-        return None
+        try:
+            priority, _, command = self._queue.get(timeout=timeout)
+            return command
+        except queue.Empty:
+            return None
 
     def clear(self) -> None:
         """Clear all commands from queue.
 
         CRITICAL: This must be called when STOP command is received.
-        
-        TODO: Clear all items from queue
-        TODO: Thread-safe operation
         """
-        # TODO: Implement clear
-        # with self._lock:
-        #     while not self._queue.empty():
-        #         try:
-        #             self._queue.get_nowait()
-        #         except queue.Empty:
-        #             break
-        pass
+        with self._lock:
+            while not self._queue.empty():
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    break
 
     def is_empty(self) -> bool:
         """Check if queue is empty.
 
         Returns:
             True if queue is empty
-            
-        TODO: Check if queue is empty
         """
-        # TODO: Implement
-        # return self._queue.empty()
-        return True
+        return self._queue.empty()
 
     def size(self) -> int:
         """Get current queue size.
 
         Returns:
             Number of commands in queue
-            
-        TODO: Get queue size
         """
-        # TODO: Implement
-        # return self._queue.qsize()
-        return 0
+        return self._queue.qsize()
