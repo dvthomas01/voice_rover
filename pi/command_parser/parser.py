@@ -173,10 +173,10 @@ class CommandParser:
             )
             if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
                 if turn_counterclockwise_with_angle.start() < best_start:
-                    best_match = (CommandType.TURN_LEFT, turn_counterclockwise_with_angle)
+                    best_match = (CommandType.ROTATE_COUNTERCLOCKWISE, turn_counterclockwise_with_angle)
                     best_start = turn_counterclockwise_with_angle.start()
                     best_end = turn_counterclockwise_with_angle.end()
-                    angle_match_info = ("left", float(turn_counterclockwise_with_angle.group(1)))
+                    angle_match_info = ("counterclockwise", float(turn_counterclockwise_with_angle.group(1)))
 
             turn_clockwise_with_angle = re.search(
                 r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
@@ -185,10 +185,10 @@ class CommandParser:
             )
             if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
                 if turn_clockwise_with_angle.start() < best_start:
-                    best_match = (CommandType.TURN_RIGHT, turn_clockwise_with_angle)
+                    best_match = (CommandType.ROTATE_CLOCKWISE, turn_clockwise_with_angle)
                     best_start = turn_clockwise_with_angle.start()
                     best_end = turn_clockwise_with_angle.end()
-                    angle_match_info = ("right", float(turn_clockwise_with_angle.group(1)))
+                    angle_match_info = ("clockwise", float(turn_clockwise_with_angle.group(1)))
 
             for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
                             CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
@@ -227,10 +227,10 @@ class CommandParser:
             if angle_match_info:
                 direction, angle = angle_match_info
                 speed = self._extract_speed(context, self.DEFAULT_SPEED)
-                if direction == "left":
-                    cmd = Command(CommandType.TURN_LEFT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
+                if direction == "counterclockwise":
+                    cmd = Command(CommandType.ROTATE_COUNTERCLOCKWISE, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
                 else:
-                    cmd = Command(CommandType.TURN_RIGHT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
+                    cmd = Command(CommandType.ROTATE_CLOCKWISE, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
             elif cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT]:
                 cmd = self._parse_intermediate(context)
             elif cmd_type in [CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
@@ -335,31 +335,6 @@ class CommandParser:
         """Parse intermediate command."""
         speed = self._extract_speed(text, self.DEFAULT_SPEED)
 
-        turn_counterclockwise_with_angle = re.search(
-            r"(?:turn|rotate)\s+(?:counter\s*)?clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
-            text,
-            re.IGNORECASE
-        )
-        if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
-            angle = float(turn_counterclockwise_with_angle.group(1))
-            return Command(
-                CommandType.TURN_LEFT,
-                {"angle": angle, "speed": speed},
-                PRIORITY_NORMAL
-            )
-
-        turn_clockwise_with_angle = re.search(
-            r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
-            text,
-            re.IGNORECASE
-        )
-        if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
-            angle = float(turn_clockwise_with_angle.group(1))
-            return Command(
-                CommandType.TURN_RIGHT,
-                {"angle": angle, "speed": speed},
-                PRIORITY_NORMAL
-            )
 
         turn_left_match = re.search(r"(?:turn|move)\s+left(?:\s+(\d+(?:\.\d+)?)\s*degrees?)?", text)
         if turn_left_match:
