@@ -100,14 +100,15 @@ python scripts/test_audio_files.py
 
 ### with_modifier.wav
 - **Transcribed**: "jarvis move forward fast turn left slowly then make a star."
-- **Parsed**: 2 commands
-  1. `turn_left` (angle: 90°, speed: 0.7 - from "fast")
-  2. `make_star` (size: 0.5, speed: 0.4)
+- **Parsed**: 3 commands
+  1. `move_forward` (speed: 0.7 - from "fast")
+  2. `turn_left` (angle: 90°, speed: 0.2 - from "slowly")
+  3. `make_star` (size: 0.5, speed: 0.4)
 
-**Note**: The transcription shows "move forward fast" but the parser extracted "turn left" with fast speed. This is because:
-- Whisper transcribed: "jarvis move forward fast turn left slowly"
-- Parser matched "turn left" first (intermediate commands checked before primitives)
-- "fast" modifier was applied to the turn command
+**Note**: The parser now correctly:
+- Extracts all commands in order
+- Associates modifiers with the correct command ("fast" → move_forward, "slowly" → turn_left)
+- Handles adverbs (slowly, quickly, rapidly) in addition to adjectives (fast, slow, quick)
 
 ## Running Tests
 

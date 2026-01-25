@@ -24,10 +24,17 @@ class CommandParser:
         "fast": 0.7,
         "slow": 0.2,
         "slowly": 0.2,
+        "quickly": 0.7,
+        "quick": 0.7,
+        "rapidly": 0.8,
+        "rapid": 0.8,
         "a bit faster": 0.6,
         "a bit slower": 0.3,
+        "a bit quicker": 0.6,
         "very fast": 0.9,
         "very slow": 0.15,
+        "very quickly": 0.9,
+        "very slowly": 0.15,
     }
 
     def __init__(self):
@@ -134,14 +141,75 @@ class CommandParser:
             if not segment:
                 continue
 
-            cmd = self._parse_single_command(segment)
-            if cmd:
-                if isinstance(cmd, list):
-                    commands.extend(cmd)
-                else:
-                    commands.append(cmd)
+            segment_commands = self._parse_segment_commands(segment)
+            if segment_commands:
+                commands.extend(segment_commands)
 
         return commands if commands else None
+
+    def _parse_segment_commands(self, text: str) -> List[Command]:
+        """Parse all commands from a segment, handling multiple commands in one segment.
+        
+        This handles cases like "move forward fast turn left slowly" where
+        multiple commands appear without transition words.
+        """
+        commands = []
+        remaining_text = text
+        
+        while remaining_text.strip():
+            best_match = None
+            best_start = len(remaining_text)
+            best_end = 0
+            
+            for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
+                            CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
+                            CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE, 
+                            CommandType.MAKE_STAR, CommandType.ZIGZAG, CommandType.SPIN, 
+                            CommandType.DANCE]:
+                patterns = self._synonyms.get(cmd_type, [])
+                for pattern in patterns:
+                    match = re.search(pattern, remaining_text, re.IGNORECASE)
+                    if match and match.start() < best_start:
+                        best_match = (cmd_type, match)
+                        best_start = match.start()
+                        best_end = match.end()
+            
+            for cmd_type in [CommandType.MOVE_FORWARD, CommandType.MOVE_BACKWARD,
+                            CommandType.ROTATE_CLOCKWISE, CommandType.ROTATE_COUNTERCLOCKWISE,
+                            CommandType.STOP]:
+                patterns = self._synonyms.get(cmd_type, [])
+                for pattern in patterns:
+                    match = re.search(pattern, remaining_text, re.IGNORECASE)
+                    if match and match.start() < best_start:
+                        best_match = (cmd_type, match)
+                        best_start = match.start()
+                        best_end = match.end()
+            
+            if not best_match:
+                break
+            
+            cmd_type, match = best_match
+            command_text = remaining_text[best_start:best_end]
+            
+            context_start = max(0, best_start - 20)
+            context_end = min(len(remaining_text), best_end + 20)
+            context = remaining_text[context_start:context_end]
+            
+            if cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT,
+                          CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
+                          CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE,
+                          CommandType.MAKE_STAR, CommandType.ZIGZAG, CommandType.SPIN,
+                          CommandType.DANCE]:
+                cmd = self._parse_intermediate(context)
+            else:
+                cmd = self._parse_primitive(context)
+            
+            if cmd:
+                commands.append(cmd)
+            
+            remaining_text = remaining_text[best_end:].strip()
+        
+        return commands
 
     def _remove_wake_word(self, text: str) -> str:
         """Remove wake word from text if present."""
@@ -338,13 +406,18 @@ class CommandParser:
         return False
 
     def _extract_speed(self, text: str, default: float = DEFAULT_SPEED) -> float:
-        """Extract speed parameter from text."""
+        """Extract speed parameter from text.
+        
+        Checks for explicit speed values first, then modifiers.
+        Modifiers are checked in order (longer phrases first to avoid partial matches).
+        """
         explicit_match = re.search(r"(?:at\s+)?speed\s*[:\s]*(\d+\.?\d*)", text)
         if explicit_match:
             speed = float(explicit_match.group(1))
             return max(0.0, min(1.0, speed))
 
-        for modifier, value in self.SPEED_MODIFIERS.items():
+        sorted_modifiers = sorted(self.SPEED_MODIFIERS.items(), key=lambda x: len(x[0]), reverse=True)
+        for modifier, value in sorted_modifiers:
             if re.search(rf"\b{re.escape(modifier)}\b", text, re.IGNORECASE):
                 return value
 
