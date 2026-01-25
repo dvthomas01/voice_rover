@@ -166,18 +166,6 @@ class CommandParser:
             best_end = 0
             angle_match_info = None
             
-            turn_counterclockwise_with_angle = re.search(
-                r"(?:turn|rotate)\s+(?:counter\s*)?clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
-                remaining_text,
-                re.IGNORECASE
-            )
-            if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
-                if turn_counterclockwise_with_angle.start() < best_start:
-                    best_match = (CommandType.ROTATE_COUNTERCLOCKWISE, turn_counterclockwise_with_angle)
-                    best_start = turn_counterclockwise_with_angle.start()
-                    best_end = turn_counterclockwise_with_angle.end()
-                    angle_match_info = ("counterclockwise", float(turn_counterclockwise_with_angle.group(1)))
-
             turn_clockwise_with_angle = re.search(
                 r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
                 remaining_text,
@@ -189,6 +177,18 @@ class CommandParser:
                     best_start = turn_clockwise_with_angle.start()
                     best_end = turn_clockwise_with_angle.end()
                     angle_match_info = ("clockwise", float(turn_clockwise_with_angle.group(1)))
+
+            turn_counterclockwise_with_angle = re.search(
+                r"(?:turn|rotate)\s+counter\s*clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
+                remaining_text,
+                re.IGNORECASE
+            )
+            if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
+                if turn_counterclockwise_with_angle.start() < best_start:
+                    best_match = (CommandType.ROTATE_COUNTERCLOCKWISE, turn_counterclockwise_with_angle)
+                    best_start = turn_counterclockwise_with_angle.start()
+                    best_end = turn_counterclockwise_with_angle.end()
+                    angle_match_info = ("counterclockwise", float(turn_counterclockwise_with_angle.group(1)))
 
             for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
                             CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
