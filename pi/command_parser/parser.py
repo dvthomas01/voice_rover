@@ -61,11 +61,15 @@ class CommandParser:
             ],
             CommandType.ROTATE_CLOCKWISE: [
                 r"rotate\s+clockwise",
+                r"turn\s+clockwise",
                 r"spin\s+right",
                 r"rotate\s+right",
             ],
             CommandType.ROTATE_COUNTERCLOCKWISE: [
                 r"rotate\s+counterclockwise",
+                r"rotate\s+counter\s+clockwise",
+                r"turn\s+counterclockwise",
+                r"turn\s+counter\s+clockwise",
                 r"spin\s+left",
                 r"rotate\s+left",
             ],
@@ -161,6 +165,28 @@ class CommandParser:
             best_start = len(remaining_text)
             best_end = 0
             
+            turn_counterclockwise_with_angle = re.search(
+                r"(?:turn|rotate)\s+(?:counter\s*)?clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
+                remaining_text,
+                re.IGNORECASE
+            )
+            if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
+                if turn_counterclockwise_with_angle.start() < best_start:
+                    best_match = (CommandType.TURN_LEFT, turn_counterclockwise_with_angle)
+                    best_start = turn_counterclockwise_with_angle.start()
+                    best_end = turn_counterclockwise_with_angle.end()
+
+            turn_clockwise_with_angle = re.search(
+                r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
+                remaining_text,
+                re.IGNORECASE
+            )
+            if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
+                if turn_clockwise_with_angle.start() < best_start:
+                    best_match = (CommandType.TURN_RIGHT, turn_clockwise_with_angle)
+                    best_start = turn_clockwise_with_angle.start()
+                    best_end = turn_clockwise_with_angle.end()
+
             for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
                             CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
                             CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE, 
@@ -195,8 +221,21 @@ class CommandParser:
             context_end = min(len(remaining_text), best_end + 20)
             context = remaining_text[context_start:context_end]
             
-            if cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT,
-                          CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
+            if cmd_type == CommandType.TURN_LEFT:
+                if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
+                    angle = float(turn_counterclockwise_with_angle.group(1))
+                    speed = self._extract_speed(context, self.DEFAULT_SPEED)
+                    cmd = Command(CommandType.TURN_LEFT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
+                else:
+                    cmd = self._parse_intermediate(context)
+            elif cmd_type == CommandType.TURN_RIGHT:
+                if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
+                    angle = float(turn_clockwise_with_angle.group(1))
+                    speed = self._extract_speed(context, self.DEFAULT_SPEED)
+                    cmd = Command(CommandType.TURN_RIGHT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
+                else:
+                    cmd = self._parse_intermediate(context)
+            elif cmd_type in [CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
                           CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE,
                           CommandType.MAKE_STAR, CommandType.ZIGZAG, CommandType.SPIN,
                           CommandType.DANCE]:
@@ -297,6 +336,32 @@ class CommandParser:
     def _parse_intermediate(self, text: str) -> Optional[Command]:
         """Parse intermediate command."""
         speed = self._extract_speed(text, self.DEFAULT_SPEED)
+
+        turn_counterclockwise_with_angle = re.search(
+            r"(?:turn|rotate)\s+(?:counter\s*)?clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
+            text,
+            re.IGNORECASE
+        )
+        if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
+            angle = float(turn_counterclockwise_with_angle.group(1))
+            return Command(
+                CommandType.TURN_LEFT,
+                {"angle": angle, "speed": speed},
+                PRIORITY_NORMAL
+            )
+
+        turn_clockwise_with_angle = re.search(
+            r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
+            text,
+            re.IGNORECASE
+        )
+        if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
+            angle = float(turn_clockwise_with_angle.group(1))
+            return Command(
+                CommandType.TURN_RIGHT,
+                {"angle": angle, "speed": speed},
+                PRIORITY_NORMAL
+            )
 
         turn_left_match = re.search(r"(?:turn|move)\s+left(?:\s+(\d+(?:\.\d+)?)\s*degrees?)?", text)
         if turn_left_match:
