@@ -164,6 +164,7 @@ class CommandParser:
             best_match = None
             best_start = len(remaining_text)
             best_end = 0
+            angle_match_info = None
             
             turn_counterclockwise_with_angle = re.search(
                 r"(?:turn|rotate)\s+(?:counter\s*)?clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
@@ -175,6 +176,7 @@ class CommandParser:
                     best_match = (CommandType.TURN_LEFT, turn_counterclockwise_with_angle)
                     best_start = turn_counterclockwise_with_angle.start()
                     best_end = turn_counterclockwise_with_angle.end()
+                    angle_match_info = ("left", float(turn_counterclockwise_with_angle.group(1)))
 
             turn_clockwise_with_angle = re.search(
                 r"(?:turn|rotate)\s+clockwise(?:\s+(\d+(?:\.\d+)?)\s*degrees?)",
@@ -186,6 +188,7 @@ class CommandParser:
                     best_match = (CommandType.TURN_RIGHT, turn_clockwise_with_angle)
                     best_start = turn_clockwise_with_angle.start()
                     best_end = turn_clockwise_with_angle.end()
+                    angle_match_info = ("right", float(turn_clockwise_with_angle.group(1)))
 
             for cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT, 
                             CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
@@ -221,20 +224,15 @@ class CommandParser:
             context_end = min(len(remaining_text), best_end + 20)
             context = remaining_text[context_start:context_end]
             
-            if cmd_type == CommandType.TURN_LEFT:
-                if turn_counterclockwise_with_angle and turn_counterclockwise_with_angle.group(1):
-                    angle = float(turn_counterclockwise_with_angle.group(1))
-                    speed = self._extract_speed(context, self.DEFAULT_SPEED)
+            if angle_match_info:
+                direction, angle = angle_match_info
+                speed = self._extract_speed(context, self.DEFAULT_SPEED)
+                if direction == "left":
                     cmd = Command(CommandType.TURN_LEFT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
                 else:
-                    cmd = self._parse_intermediate(context)
-            elif cmd_type == CommandType.TURN_RIGHT:
-                if turn_clockwise_with_angle and turn_clockwise_with_angle.group(1):
-                    angle = float(turn_clockwise_with_angle.group(1))
-                    speed = self._extract_speed(context, self.DEFAULT_SPEED)
                     cmd = Command(CommandType.TURN_RIGHT, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
-                else:
-                    cmd = self._parse_intermediate(context)
+            elif cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT]:
+                cmd = self._parse_intermediate(context)
             elif cmd_type in [CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
                           CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE,
                           CommandType.MAKE_STAR, CommandType.ZIGZAG, CommandType.SPIN,
