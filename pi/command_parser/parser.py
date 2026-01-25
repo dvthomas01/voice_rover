@@ -232,26 +232,26 @@ class CommandParser:
             cmd_type, match = best_match
             command_text = remaining_text[best_start:best_end]
             
-            context_start = max(0, best_start - 20)
-            context_end = min(len(remaining_text), best_end + 20)
-            context = remaining_text[context_start:context_end]
+            command_with_modifier = self._extract_command_with_modifier(
+                remaining_text, best_start, best_end
+            )
             
             if angle_match_info:
                 direction, angle = angle_match_info
-                speed = self._extract_speed(context, self.DEFAULT_SPEED)
+                speed = self._extract_speed(command_with_modifier, self.DEFAULT_SPEED)
                 if direction == "counterclockwise":
                     cmd = Command(CommandType.ROTATE_COUNTERCLOCKWISE, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
                 else:
                     cmd = Command(CommandType.ROTATE_CLOCKWISE, {"angle": angle, "speed": speed}, PRIORITY_NORMAL)
             elif cmd_type in [CommandType.TURN_LEFT, CommandType.TURN_RIGHT]:
-                cmd = self._parse_intermediate(context)
+                cmd = self._parse_intermediate(command_with_modifier)
             elif cmd_type in [CommandType.MOVE_FORWARD_FOR_TIME, CommandType.MOVE_BACKWARD_FOR_TIME,
                           CommandType.MAKE_SQUARE, CommandType.MAKE_CIRCLE,
                           CommandType.MAKE_STAR, CommandType.ZIGZAG, CommandType.SPIN,
                           CommandType.DANCE]:
-                cmd = self._parse_intermediate(context)
+                cmd = self._parse_intermediate(command_with_modifier)
             else:
-                cmd = self._parse_primitive(context)
+                cmd = self._parse_primitive(command_with_modifier)
             
             if cmd:
                 commands.append(cmd)
@@ -480,3 +480,32 @@ class CommandParser:
         if match:
             return float(match.group(1))
         return default
+
+    def _extract_command_with_modifier(self, text: str, start: int, end: int) -> str:
+        """Extract command text with its associated modifier.
+        
+        Finds the command and any modifier immediately before or after it,
+        but not modifiers from other commands in the same segment.
+        """
+        command_text = text[start:end]
+        
+        modifier_window_start = max(0, start - 15)
+        modifier_window_end = min(len(text), end + 15)
+        modifier_window = text[modifier_window_start:modifier_window_end]
+        
+        command_with_modifier = command_text
+        
+        for modifier in sorted(self.SPEED_MODIFIERS.keys(), key=len, reverse=True):
+            modifier_pattern = rf"\b{re.escape(modifier)}\b"
+            modifier_match = re.search(modifier_pattern, modifier_window, re.IGNORECASE)
+            if modifier_match:
+                modifier_pos_in_window = modifier_match.start()
+                modifier_pos_in_text = modifier_window_start + modifier_pos_in_window
+                command_start = start
+                command_end = end
+                
+                if (modifier_pos_in_text >= command_start - 10 and modifier_pos_in_text <= command_end + 10):
+                    command_with_modifier = modifier_window
+                    break
+        
+        return command_with_modifier
