@@ -211,9 +211,10 @@ class CommandParser:
                 for pattern in patterns:
                     match = re.search(pattern, remaining_text, re.IGNORECASE)
                     if match and match.start() < best_start:
+                        extended_end = self._extend_match_for_parameters(remaining_text, match.end())
                         best_match = (cmd_type, match)
                         best_start = match.start()
-                        best_end = match.end()
+                        best_end = extended_end
             
             for cmd_type in [CommandType.MOVE_FORWARD, CommandType.MOVE_BACKWARD,
                             CommandType.ROTATE_CLOCKWISE, CommandType.ROTATE_COUNTERCLOCKWISE,
@@ -481,20 +482,40 @@ class CommandParser:
             return float(match.group(1))
         return default
 
+    def _extend_match_for_parameters(self, text: str, end_pos: int) -> int:
+        """Extend match end position to include parameters like angles, durations, etc."""
+        remaining = text[end_pos:].strip()
+        
+        angle_match = re.search(r"^\s*(\d+(?:\.\d+)?)\s*degrees?", remaining, re.IGNORECASE)
+        if angle_match:
+            return end_pos + angle_match.end()
+        
+        duration_match = re.search(r"^\s*for\s+(\d+(?:\.\d+)?)\s*seconds?", remaining, re.IGNORECASE)
+        if duration_match:
+            return end_pos + duration_match.end()
+        
+        speed_match = re.search(r"^\s*at\s+speed\s+(\d+(?:\.\d+)?)", remaining, re.IGNORECASE)
+        if speed_match:
+            return end_pos + speed_match.end()
+        
+        return end_pos
+
     def _extract_command_with_modifier(self, text: str, start: int, end: int) -> str:
         """Extract command text with its associated modifier.
         
         Finds the command and any modifier immediately before or after it,
         but not modifiers from other commands in the same segment.
+        Includes the full command match (which may extend beyond start:end for parameters).
         """
-        command_text = text[start:end]
+        extended_end = self._extend_match_for_parameters(text, end)
         
-        modifier_window_start = max(0, start - 15)
-        modifier_window_end = min(len(text), end + 15)
+        modifier_window_start = max(0, start - 12)
+        modifier_window_end = min(len(text), extended_end + 12)
         modifier_window = text[modifier_window_start:modifier_window_end]
         
-        command_with_modifier = command_text
+        command_with_modifier = modifier_window
         
+        modifier_found = False
         for modifier in sorted(self.SPEED_MODIFIERS.keys(), key=len, reverse=True):
             modifier_pattern = rf"\b{re.escape(modifier)}\b"
             modifier_match = re.search(modifier_pattern, modifier_window, re.IGNORECASE)
@@ -502,10 +523,13 @@ class CommandParser:
                 modifier_pos_in_window = modifier_match.start()
                 modifier_pos_in_text = modifier_window_start + modifier_pos_in_window
                 command_start = start
-                command_end = end
+                command_end = extended_end
                 
                 if (modifier_pos_in_text >= command_start - 10 and modifier_pos_in_text <= command_end + 10):
-                    command_with_modifier = modifier_window
+                    modifier_found = True
                     break
+        
+        if not modifier_found:
+            command_with_modifier = modifier_window
         
         return command_with_modifier
