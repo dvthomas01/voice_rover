@@ -108,16 +108,16 @@ class CommandParser:
                 r"go\s+backward\s+for",
             ],
             CommandType.MAKE_SQUARE: [
-                r"make\s+a?\s*square",
-                r"create\s+a?\s*square",
+                r"make\s+(?:a\s+)?(?:\w+\s+)?square",
+                r"create\s+(?:a\s+)?(?:\w+\s+)?square",
             ],
             CommandType.MAKE_CIRCLE: [
-                r"make\s+a?\s*circle",
-                r"create\s+a?\s*circle",
+                r"make\s+(?:a\s+)?(?:\w+\s+)?circle",
+                r"create\s+(?:a\s+)?(?:\w+\s+)?circle",
             ],
             CommandType.MAKE_STAR: [
-                r"make\s+a?\s*star",
-                r"create\s+a?\s*star",
+                r"make\s+(?:a\s+)?(?:\w+\s+)?star",
+                r"create\s+(?:a\s+)?(?:\w+\s+)?star",
             ],
             CommandType.ZIGZAG: [
                 r"zigzag",
