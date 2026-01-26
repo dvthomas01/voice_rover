@@ -515,6 +515,29 @@ class CommandParser:
 
         return default
 
+    def _extract_size(self, text: str, default: float, param_name: str = "size") -> float:
+        """Extract size parameter from text (for shapes: side_length, radius, size).
+        
+        Args:
+            text: Text to search
+            default: Default value if no modifier found
+            param_name: Parameter name for explicit number extraction
+            
+        Returns:
+            Size value (0.0 to 1.0+)
+        """
+        explicit_match = re.search(rf"{param_name}\s*[:\s]*(\d+\.?\d*)", text, re.IGNORECASE)
+        if explicit_match:
+            size = float(explicit_match.group(1))
+            return max(0.0, size)
+
+        sorted_modifiers = sorted(self.SIZE_MODIFIERS.items(), key=lambda x: len(x[0]), reverse=True)
+        for modifier, value in sorted_modifiers:
+            if re.search(rf"\b{re.escape(modifier)}\b", text, re.IGNORECASE):
+                return value
+
+        return default
+
     def _extract_number(self, text: str, keyword: str, default: float) -> float:
         """Extract number parameter from text."""
         pattern = rf"{re.escape(keyword)}\s*[:\s]*(\d+\.?\d*)"
