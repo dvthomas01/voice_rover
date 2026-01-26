@@ -226,7 +226,7 @@ class TestCommandParser:
 
     def test_parse_dance(self):
         """Test dance command."""
-        cmd = self.parser.parse("dance")
+        cmd = self.parser.parse("jarvis dance")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.DANCE
         assert cmd[0].parameters == {}
