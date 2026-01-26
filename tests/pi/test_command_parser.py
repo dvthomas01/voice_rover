@@ -25,7 +25,7 @@ class TestCommandParser:
         """Test forward command synonyms."""
         synonyms = ["go forward", "forward", "move ahead", "go ahead"]
         for text in synonyms:
-            cmd = self.parser.parse(text)
+            cmd = self.parser.parse(f"jarvis {text}")
             assert cmd is not None
             assert cmd[0].command_type == CommandType.MOVE_FORWARD
 
@@ -126,25 +126,25 @@ class TestCommandParser:
 
     def test_parse_speed_modifier_fast(self):
         """Test speed modifier 'fast'."""
-        cmd = self.parser.parse("move forward fast")
+        cmd = self.parser.parse("jarvis move forward fast")
         assert cmd is not None
         assert cmd[0].parameters["speed"] == 0.7
 
     def test_parse_speed_modifier_slow(self):
         """Test speed modifier 'slow'."""
-        cmd = self.parser.parse("move forward slow")
+        cmd = self.parser.parse("jarvis move forward slow")
         assert cmd is not None
         assert cmd[0].parameters["speed"] == 0.2
 
     def test_parse_speed_modifier_a_bit_faster(self):
         """Test speed modifier 'a bit faster'."""
-        cmd = self.parser.parse("move forward a bit faster")
+        cmd = self.parser.parse("jarvis move forward a bit faster")
         assert cmd is not None
         assert cmd[0].parameters["speed"] == 0.6
 
     def test_parse_speed_modifier_scope(self):
         """Test modifier only applies to attached command."""
-        cmd = self.parser.parse("move forward fast, turn right")
+        cmd = self.parser.parse("jarvis move forward fast, turn right")
         assert cmd is not None
         assert len(cmd) == 2
         assert cmd[0].parameters["speed"] == 0.7
@@ -152,13 +152,13 @@ class TestCommandParser:
 
     def test_parse_explicit_speed(self):
         """Test explicit speed parameter."""
-        cmd = self.parser.parse("move forward at speed 0.8")
+        cmd = self.parser.parse("jarvis move forward at speed 0.8")
         assert cmd is not None
         assert cmd[0].parameters["speed"] == 0.8
 
     def test_parse_move_forward_for_time(self):
         """Test move forward for time command."""
-        cmd = self.parser.parse("move forward for 2 seconds")
+        cmd = self.parser.parse("jarvis move forward for 2 seconds")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MOVE_FORWARD_FOR_TIME
         assert cmd[0].parameters["duration"] == 2.0
@@ -166,14 +166,14 @@ class TestCommandParser:
 
     def test_parse_move_backward_for_time(self):
         """Test move backward for time command."""
-        cmd = self.parser.parse("move backward for 1.5 seconds")
+        cmd = self.parser.parse("jarvis move backward for 1.5 seconds")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MOVE_BACKWARD_FOR_TIME
         assert cmd[0].parameters["duration"] == 1.5
 
     def test_parse_make_square(self):
         """Test make square command."""
-        cmd = self.parser.parse("make a square")
+        cmd = self.parser.parse("jarvis make a square")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MAKE_SQUARE
         assert cmd[0].parameters["side_length"] == 0.5
@@ -181,13 +181,13 @@ class TestCommandParser:
 
     def test_parse_make_square_synonym(self):
         """Test make square with 'create' synonym."""
-        cmd = self.parser.parse("create a square")
+        cmd = self.parser.parse("jarvis create a square")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MAKE_SQUARE
 
     def test_parse_make_circle(self):
         """Test make circle command."""
-        cmd = self.parser.parse("make a circle")
+        cmd = self.parser.parse("jarvis make a circle")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MAKE_CIRCLE
         assert cmd[0].parameters["radius"] == 0.5
@@ -196,20 +196,20 @@ class TestCommandParser:
 
     def test_parse_make_circle_synonym(self):
         """Test make circle with 'create' synonym."""
-        cmd = self.parser.parse("create a circle")
+        cmd = self.parser.parse("jarvis create a circle")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MAKE_CIRCLE
 
     def test_parse_make_star(self):
         """Test make star command."""
-        cmd = self.parser.parse("make a star")
+        cmd = self.parser.parse("jarvis make a star")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.MAKE_STAR
         assert cmd[0].parameters["size"] == 0.5
 
     def test_parse_zigzag(self):
         """Test zigzag command."""
-        cmd = self.parser.parse("zigzag")
+        cmd = self.parser.parse("jarvis zigzag")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.ZIGZAG
         assert cmd[0].parameters["segment_length"] == 0.3
@@ -218,7 +218,7 @@ class TestCommandParser:
 
     def test_parse_spin(self):
         """Test spin command."""
-        cmd = self.parser.parse("spin for 2 seconds")
+        cmd = self.parser.parse("jarvis spin for 2 seconds")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.SPIN
         assert cmd[0].parameters["duration"] == 2.0
