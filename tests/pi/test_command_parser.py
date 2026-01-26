@@ -262,10 +262,11 @@ class TestCommandParser:
     def test_wake_word_removal(self):
         """Test wake word is properly removed."""
         cmd1 = self.parser.parse("jarvis, move forward")
-        cmd2 = self.parser.parse("move forward")
         assert cmd1 is not None
-        assert cmd2 is not None
-        assert cmd1[0].command_type == cmd2[0].command_type
+        assert cmd1[0].command_type == CommandType.MOVE_FORWARD
+        
+        cmd2 = self.parser.parse("move forward")
+        assert cmd2 is None
 
     def test_command_priority(self):
         """Test that STOP command has highest priority."""
