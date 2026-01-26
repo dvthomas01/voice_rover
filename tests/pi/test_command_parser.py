@@ -14,7 +14,7 @@ class TestCommandParser:
 
     def test_parse_forward_command(self):
         """Test parsing forward movement commands."""
-        cmd = self.parser.parse("move forward")
+        cmd = self.parser.parse("jarvis move forward")
         assert cmd is not None
         assert len(cmd) == 1
         assert cmd[0].command_type == CommandType.MOVE_FORWARD
