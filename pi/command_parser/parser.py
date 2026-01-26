@@ -37,6 +37,18 @@ class CommandParser:
         "very slowly": 0.15,
     }
 
+    SIZE_MODIFIERS = {
+        "small": 0.3,
+        "tiny": 0.2,
+        "little": 0.25,
+        "large": 0.8,
+        "big": 0.75,
+        "huge": 1.0,
+        "giant": 1.0,
+        "medium": 0.5,
+        "normal": 0.5,
+    }
+
     def __init__(self):
         """Initialize command parser."""
         self._synonyms = self._build_synonym_patterns()
@@ -127,11 +139,22 @@ class CommandParser:
 
         Returns:
             List of Command objects, or None if parsing fails
+            
+        Note:
+            Wake word "jarvis" is required for all commands except "stop".
+            "stop" command works with or without wake word.
         """
         if not text or not text.strip():
             return None
 
         text = text.strip().lower()
+        
+        has_wake_word = self._has_wake_word(text)
+        is_stop_command = self._is_stop_command(text)
+        
+        if not has_wake_word and not is_stop_command:
+            return None
+        
         text = self._remove_wake_word(text)
         
         if not text:
@@ -261,10 +284,28 @@ class CommandParser:
         
         return commands
 
+    def _has_wake_word(self, text: str) -> bool:
+        """Check if text contains wake word."""
+        return bool(re.search(r"\bjarvis\b", text, re.IGNORECASE))
+    
+    def _is_stop_command(self, text: str) -> bool:
+        """Check if text is a stop command (works without wake word)."""
+        stop_patterns = [
+            r"^stop\b",
+            r"^halt\b",
+            r"^emergency\s+stop\b",
+            r"^cease\b",
+        ]
+        for pattern in stop_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        return False
+
     def _remove_wake_word(self, text: str) -> str:
         """Remove wake word from text if present."""
         text = re.sub(r"^jarvis\s*,?\s*", "", text, flags=re.IGNORECASE)
         text = re.sub(r"^hey\s+jarvis\s*,?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bjarvis\s*,?\s*", "", text, flags=re.IGNORECASE)
         return text.strip()
 
     def _split_commands(self, text: str) -> List[str]:
