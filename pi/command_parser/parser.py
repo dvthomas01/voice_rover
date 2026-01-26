@@ -433,7 +433,7 @@ class CommandParser:
             )
 
         if self._matches_pattern(text, CommandType.MAKE_SQUARE):
-            side_length = self._extract_number(text, "side", self.DEFAULT_SIDE_LENGTH)
+            side_length = self._extract_size(text, self.DEFAULT_SIDE_LENGTH, "side")
             return Command(
                 CommandType.MAKE_SQUARE,
                 {"side_length": side_length, "speed": speed},
@@ -441,7 +441,7 @@ class CommandParser:
             )
 
         if self._matches_pattern(text, CommandType.MAKE_CIRCLE):
-            radius = self._extract_number(text, "radius", self.DEFAULT_RADIUS)
+            radius = self._extract_size(text, self.DEFAULT_RADIUS, "radius")
             direction_match = re.search(r"(left|right|counterclockwise|clockwise)", text)
             direction = "left" if direction_match and direction_match.group(1) in ["left", "counterclockwise"] else "left"
             if direction_match and direction_match.group(1) in ["right", "clockwise"]:
@@ -453,7 +453,7 @@ class CommandParser:
             )
 
         if self._matches_pattern(text, CommandType.MAKE_STAR):
-            size = self._extract_number(text, "size", self.DEFAULT_STAR_SIZE)
+            size = self._extract_size(text, self.DEFAULT_STAR_SIZE, "size")
             return Command(
                 CommandType.MAKE_STAR,
                 {"size": size, "speed": speed},
