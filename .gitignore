@@ -36,5 +36,8 @@ Thumbs.db
 memory-bank/
 CLAUDE.md
 
-#Extra
-.github_setup_instructions.md
+# Documentation files (only README.md should be in repo)
+*.md
+!README.md
+# Allow docs/ directory MD files (API, hardware setup)
+!docs/*.md

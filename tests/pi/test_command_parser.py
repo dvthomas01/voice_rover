@@ -31,7 +31,7 @@ class TestCommandParser:
 
     def test_parse_backward_command(self):
         """Test parsing backward movement commands."""
-        cmd = self.parser.parse("move backward")
+        cmd = self.parser.parse("jarvis move backward")
         assert cmd is not None
         assert len(cmd) == 1
         assert cmd[0].command_type == CommandType.MOVE_BACKWARD
@@ -39,7 +39,7 @@ class TestCommandParser:
 
     def test_parse_backward_synonyms(self):
         """Test backward command synonyms."""
-        synonyms = ["go backward", "backward", "back up", "reverse"]
+        synonyms = ["jarvis go backward", "jarvis backward", "jarvis back up", "jarvis reverse"]
         for text in synonyms:
             cmd = self.parser.parse(text)
             assert cmd is not None
@@ -47,19 +47,19 @@ class TestCommandParser:
 
     def test_parse_rotate_clockwise(self):
         """Test parsing clockwise rotation."""
-        cmd = self.parser.parse("rotate clockwise")
+        cmd = self.parser.parse("jarvis rotate clockwise")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.ROTATE_CLOCKWISE
 
     def test_parse_rotate_counterclockwise(self):
         """Test parsing counterclockwise rotation."""
-        cmd = self.parser.parse("rotate counterclockwise")
+        cmd = self.parser.parse("jarvis rotate counterclockwise")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.ROTATE_COUNTERCLOCKWISE
 
     def test_parse_turn_left_default(self):
         """Test turn left defaults to 90 degrees."""
-        cmd = self.parser.parse("turn left")
+        cmd = self.parser.parse("jarvis turn left")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.TURN_LEFT
         assert cmd[0].parameters["angle"] == 90.0
@@ -67,14 +67,14 @@ class TestCommandParser:
 
     def test_parse_turn_left_explicit_angle(self):
         """Test turn left with explicit angle."""
-        cmd = self.parser.parse("turn left 45 degrees")
+        cmd = self.parser.parse("jarvis turn left 45 degrees")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.TURN_LEFT
         assert cmd[0].parameters["angle"] == 45.0
 
     def test_parse_turn_right_default(self):
         """Test turn right defaults to 90 degrees."""
-        cmd = self.parser.parse("turn right")
+        cmd = self.parser.parse("jarvis turn right")
         assert cmd is not None
         assert cmd[0].command_type == CommandType.TURN_RIGHT
         assert cmd[0].parameters["angle"] == 90.0

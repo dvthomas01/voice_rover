@@ -35,10 +35,10 @@ class TestParserIntegration:
     def test_synonym_variations(self):
         """Test various synonym phrasings."""
         forward_variations = [
-            "move forward",
-            "go forward",
-            "forward",
-            "move ahead",
+            "jarvis move forward",
+            "jarvis go forward",
+            "jarvis forward",
+            "jarvis move ahead",
         ]
         
         for text in forward_variations:
@@ -49,10 +49,10 @@ class TestParserIntegration:
     def test_speed_modifiers(self):
         """Test speed modifier application."""
         test_cases = [
-            ("move forward fast", 0.7),
-            ("move forward slow", 0.2),
-            ("move forward a bit faster", 0.6),
-            ("move forward", 0.4),
+            ("jarvis move forward fast", 0.7),
+            ("jarvis move forward slow", 0.2),
+            ("jarvis move forward a bit faster", 0.6),
+            ("jarvis move forward", 0.4),
         ]
 
         for text, expected_speed in test_cases:
@@ -62,7 +62,7 @@ class TestParserIntegration:
 
     def test_modifier_scope(self):
         """Test that modifiers only apply to attached command."""
-        result = self.parser.parse("move forward fast, turn right")
+        result = self.parser.parse("jarvis move forward fast, turn right")
         assert result is not None
         assert len(result) == 2
         assert result[0].parameters["speed"] == 0.7
@@ -70,23 +70,23 @@ class TestParserIntegration:
 
     def test_angle_defaults(self):
         """Test angle defaults for turn commands."""
-        result = self.parser.parse("turn left")
+        result = self.parser.parse("jarvis turn left")
         assert result is not None
         assert result[0].parameters["angle"] == 90.0
 
-        result = self.parser.parse("turn right")
+        result = self.parser.parse("jarvis turn right")
         assert result is not None
         assert result[0].parameters["angle"] == 90.0
 
     def test_explicit_angles(self):
         """Test explicit angle specification."""
-        result = self.parser.parse("turn left 45 degrees")
+        result = self.parser.parse("jarvis turn left 45 degrees")
         assert result is not None
         assert result[0].parameters["angle"] == 45.0
 
     def test_intermediate_commands_not_expanded(self):
         """Test that intermediate commands are not expanded."""
-        result = self.parser.parse("make a circle")
+        result = self.parser.parse("jarvis make a circle")
         assert result is not None
         assert result[0].command_type == CommandType.MAKE_CIRCLE
         assert "radius" in result[0].parameters

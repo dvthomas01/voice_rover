@@ -573,8 +573,8 @@ class CommandParser:
         """
         extended_end = self._extend_match_for_parameters(text, end)
         
-        modifier_window_start = max(0, start - 12)
-        modifier_window_end = min(len(text), extended_end + 12)
+        modifier_window_start = max(0, start - 15)
+        modifier_window_end = min(len(text), extended_end + 20)
         modifier_window = text[modifier_window_start:modifier_window_end]
         
         command_with_modifier = modifier_window
@@ -589,7 +589,7 @@ class CommandParser:
                 command_start = start
                 command_end = extended_end
                 
-                if (modifier_pos_in_text >= command_start - 10 and modifier_pos_in_text <= command_end + 10):
+                if (modifier_pos_in_text >= command_start - 15 and modifier_pos_in_text <= command_end + 15):
                     modifier_found = True
                     break
         
