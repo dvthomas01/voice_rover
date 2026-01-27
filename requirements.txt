@@ -4,6 +4,7 @@ pyserial>=3.5
 # Audio processing
 numpy>=1.24.0
 pyaudio>=0.2.13
+sounddevice>=0.4.6  # Simpler audio capture alternative
 scipy>=1.10.0  # For audio resampling (44.1kHz/48kHz -> 16kHz)
 
 # Wake word detection
