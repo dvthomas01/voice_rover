@@ -82,7 +82,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Configure serial port in `pi/config.py` (default: `/dev/ttyUSB0`)
+4. Set Porcupine access key (for wake word detection):
+```bash
+export PORCUPINE_ACCESS_KEY="your-key-here"
+# Or add to ~/.zshrc or ~/.bashrc for persistence
+```
+Get a free key from: https://console.picovoice.ai/
+
+5. Configure serial port in `pi/config.py` (default: `/dev/ttyUSB0`)
 
 ### ESP32 Setup
 
@@ -274,8 +281,10 @@ ESP32 firmware can be tested with serial loopback or mock serial port.
 
 ### Wake word not detected
 - Check microphone connection and permissions
+- Verify `PORCUPINE_ACCESS_KEY` environment variable is set
 - Verify `WAKE_WORD_SENSITIVITY` in `pi/config.py`
-- Test microphone: `arecord -d 5 test.wav`
+- Test microphone: `python scripts/test_microphone_input.py`
+- Test wake word detection: `python scripts/test_wake_word_detection.py`
 
 ### Commands not executing
 - Check serial connection: `ls /dev/ttyUSB*`
