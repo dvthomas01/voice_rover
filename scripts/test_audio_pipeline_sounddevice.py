@@ -33,7 +33,7 @@ def main():
     print("\nThis test will:")
     print("1. Initialize microphone with sounddevice (16kHz float32)")
     print("2. Load Whisper model")
-    print("3. Capture audio for 5 seconds when you speak")
+    print("3. Capture audio for 8 seconds when you speak")
     print("4. Transcribe with Whisper")
     print("5. Parse commands")
     print("\nPress Ctrl+C to exit.\n")
@@ -66,12 +66,12 @@ def main():
         print()
         
         while True:
-            input("\nPress Enter to start recording (5 seconds)...")
+            input("\nPress Enter to start recording (8 seconds)...")
             
             print("\n[Recording...]", end="", flush=True)
             
-            # Capture audio for 5 seconds
-            audio_data = mic.capture_audio(duration=5.0)
+            # Capture audio for 8 seconds
+            audio_data = mic.capture_audio(duration=8.0)
             
             if len(audio_data) == 0:
                 print(" No audio captured")

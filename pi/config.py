@@ -25,7 +25,7 @@ MAX_QUEUE_SIZE = 100
 COMMAND_TIMEOUT = 5.0
 
 # Audio capture settings
-AUDIO_CAPTURE_DURATION = 6.0  # Duration in seconds to capture audio after wake word
+AUDIO_CAPTURE_DURATION = 8.0  # Duration in seconds to capture audio after wake word
 
 # Logging
 LOG_LEVEL = "INFO"
