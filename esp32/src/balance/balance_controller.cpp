@@ -1,52 +1,28 @@
 #include "balance_controller.h"
 #include <Arduino.h>
+#include <math.h>
 #include "../include/config.h"
+
+// Sign convention (LOCKED): positive pitch = lean forward, positive motor = wheels forward.
+// So: error = angle - target => lean forward => positive error => positive output.
 
 BalanceController::BalanceController(float kp, float ki, float kd)
     : kp_(kp), ki_(ki), kd_(kd), integral_(0.0), previous_error_(0.0),
-      motor_output_(0.0), last_update_time_(0),
+      motor_output_(0.0), last_update_time_(0), last_angle_(0.0),
       velocity_setpoint_(0.0), rotation_setpoint_(0.0) {
 }
 
 void BalanceController::update(float angle, float angular_velocity, float wheel_velocity) {
-    // TODO: Implement PID balance control
-    // 
-    // CRITICAL: This function must run at 100Hz and never be disabled
-    // 
-    // Algorithm:
-    // 1. Calculate error: target_angle - current_angle
-    //    - Target angle = BALANCE_ANGLE_OFFSET (typically 0°)
-    //    - Current angle = angle parameter
-    // 
-    // 2. Calculate PID terms:
-    //    - P term = kp * error
-    //    - I term = ki * integral (with windup protection)
-    //    - D term = kd * (error - previous_error) / dt
-    // 
-    // 3. Optional: Add velocity feedforward from wheel_velocity
-    // 
-    // 4. Add motion setpoints:
-    //    - Balance output + velocity_setpoint_ + rotation_setpoint_
-    // 
-    // 5. Clamp output to motor limits
-    // 
-    // 6. Update state for next iteration
-    
-    unsigned long current_time = millis();
-    float dt = (current_time - last_update_time_) / 1000.0;
-    if (dt <= 0) dt = 0.01;  // Prevent division by zero
-    
-    // Calculate PID output
-    motor_output_ = calculatePID(angle, angular_velocity);
-    
-    // TODO: Add motion setpoints
-    // motor_output_ += velocity_setpoint_;
-    // motor_output_ += rotation_setpoint_;
-    
-    // Clamp output
+    // CRITICAL: Run at 100 Hz. Fixed dt = 0.01 s. wheel_velocity unused (reserved for feedforward).
+    (void)wheel_velocity;
+
+    last_angle_ = angle;
+
+    float balance_pid = calculatePID(angle, angular_velocity);
+    motor_output_ = balance_pid + velocity_setpoint_;
     motor_output_ = constrain(motor_output_, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
-    
-    last_update_time_ = current_time;
+
+    last_update_time_ = millis();
 }
 
 float BalanceController::getMotorOutput() {
@@ -54,18 +30,14 @@ float BalanceController::getMotorOutput() {
 }
 
 void BalanceController::setVelocitySetpoint(float velocity) {
-    // TODO: Set velocity setpoint for forward/backward motion
-    // This modifies balance control, doesn't replace it
     velocity_setpoint_ = velocity;
 }
 
 void BalanceController::setRotationSetpoint(float angular_velocity) {
-    // TODO: Set rotation setpoint for turning
     rotation_setpoint_ = angular_velocity;
 }
 
 void BalanceController::setNeutral() {
-    // TODO: Clear motion setpoints, return to balance-only mode
     velocity_setpoint_ = 0.0;
     rotation_setpoint_ = 0.0;
 }
@@ -79,15 +51,7 @@ void BalanceController::reset() {
 }
 
 bool BalanceController::isBalanced() {
-    // TODO: Check if angle is within acceptable range
-    // Use MAX_TILT_ANGLE from config.h
-    // Return false if robot has fallen (emergency stop)
-    
-    // Example:
-    // float current_angle = ...;  // Need to track current angle
-    // return abs(current_angle) < MAX_TILT_ANGLE;
-    
-    return true;  // Placeholder
+    return fabs(last_angle_) < FALL_DETECTION_THRESHOLD;
 }
 
 float BalanceController::getVelocitySetpoint() const {
@@ -99,35 +63,23 @@ float BalanceController::getRotationSetpoint() const {
 }
 
 float BalanceController::calculatePID(float angle, float angular_velocity) {
-    // TODO: Implement PID calculation
-    // 
-    // 1. Calculate error (target angle - current angle)
-    float target_angle = BALANCE_ANGLE_OFFSET;
-    float error = target_angle - angle;
-    
-    // 2. Calculate P term
+    // Option A: error = angle - target => lean forward => positive output (wheels forward)
+    const float target_angle = BALANCE_ANGLE_OFFSET;
+    float error = angle - target_angle;
+
     float p_term = kp_ * error;
-    
-    // 3. Calculate I term (with windup protection)
-    integral_ += error * 0.01;  // dt = 0.01 (100Hz)
+
+    integral_ += error * 0.01f;  // fixed dt = 0.01 (100 Hz)
     limitIntegral();
     float i_term = ki_ * integral_;
-    
-    // 4. Calculate D term
-    float d_term = kd_ * (error - previous_error_) / 0.01;
+
+    // Derivative on measurement: -Kd * angular_velocity (no derivative kick)
+    float d_term = -kd_ * angular_velocity;
+
     previous_error_ = error;
-    
-    // 5. Combine terms
-    float output = p_term + i_term + d_term;
-    
-    return output;
+    return p_term + i_term + d_term;
 }
 
 void BalanceController::limitIntegral() {
-    // TODO: Implement integral windup protection
-    // Limit integral to prevent excessive accumulation
-    // Example:
-    // float max_integral = 100.0;  // Adjust based on tuning
-    // if (integral_ > max_integral) integral_ = max_integral;
-    // if (integral_ < -max_integral) integral_ = -max_integral;
+    integral_ = constrain(integral_, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 }

@@ -86,24 +86,15 @@ void loop() {
         // Update balance controller
         balanceController.update(angle, angular_velocity, avg_wheel_velocity);
 
-        // Get motor output from balance controller
+        // Balance output already includes velocity_setpoint; main applies rotation as L/R diff
         float motorOutput = balanceController.getMotorOutput();
-
-        // TODO: Apply motor output to both motors
-        // For differential drive with balance:
-        // - Both motors get base balance output
-        // - Add/subtract rotation setpoint for turning
-        // - Add velocity setpoint for forward/backward
-        // 
-        // Example:
-        // float left_speed = motorOutput + balanceController.getRotationSetpoint();
-        // float right_speed = motorOutput - balanceController.getRotationSetpoint();
-        // leftMotor.setSpeed(left_speed);
-        // rightMotor.setSpeed(right_speed);
-        
-        // Temporary: Apply same output to both motors
-        leftMotor.setSpeed(motorOutput);
-        rightMotor.setSpeed(motorOutput);
+        float rot = balanceController.getRotationSetpoint();
+        int left_speed = (int)(motorOutput + rot);
+        int right_speed = (int)(motorOutput - rot);
+        left_speed = constrain(left_speed, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
+        right_speed = constrain(right_speed, -MAX_MOTOR_SPEED, MAX_MOTOR_SPEED);
+        leftMotor.setSpeed(left_speed);
+        rightMotor.setSpeed(right_speed);
 
         // Check if robot has fallen
         if (!balanceController.isBalanced()) {

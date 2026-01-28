@@ -90,10 +90,11 @@ private:
     float previous_error_;
     float motor_output_;
     unsigned long last_update_time_;
-    
+    float last_angle_;  // For isBalanced() fall detection
+
     // Motion setpoints (modify balance, don't replace it)
-    float velocity_setpoint_;     // Forward/backward velocity
-    float rotation_setpoint_;     // Rotation angular velocity
+    float velocity_setpoint_;     // Forward/backward (motor units)
+    float rotation_setpoint_;     // L/R differential (motor units), applied in main
     
     // PID calculation
     float calculatePID(float angle, float angular_velocity);

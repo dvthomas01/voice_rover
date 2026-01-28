@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include "../include/config.h"
 
 // Forward declarations
 class BalanceController;

@@ -38,8 +38,9 @@
 // Balance controller settings
 #define BALANCE_LOOP_FREQ 100  // Hz (10ms period) - CRITICAL: Must maintain this frequency
 #define BALANCE_ANGLE_OFFSET 0.0  // degrees (calibrated offset)
-#define MAX_TILT_ANGLE 45.0  // degrees (fall detection threshold)
-#define FALL_DETECTION_THRESHOLD 40.0  // degrees (emergency stop threshold)
+#define MAX_TILT_ANGLE 45.0  // degrees (max acceptable tilt)
+#define FALL_DETECTION_THRESHOLD 40.0  // degrees (emergency stop: isBalanced() uses this)
+#define INTEGRAL_LIMIT 50.0  // integral windup clamp (tune if needed)
 
 // Motor control settings
 #define MAX_MOTOR_SPEED 255
