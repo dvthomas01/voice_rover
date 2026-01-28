@@ -2,48 +2,51 @@
 
 INTEGRATION POINT: Wake word detector uses get_audio_chunk()
 INTEGRATION POINT: Whisper transcriber uses capture_audio()
-HARDWARE: Samson Go Mic USB (44.1kHz/48kHz, resample to 16kHz for Whisper)
+HARDWARE: Works with USB microphones (Samson Go Mic) and built-in mics
+IMPLEMENTATION: Uses sounddevice for reliable cross-platform audio capture
 """
 
 import logging
+import queue
+import threading
 from typing import Optional
 import numpy as np
-import pyaudio
-from scipy import signal
-from ..config import SAMPLE_RATE, AUDIO_CHANNELS, CHUNK_SIZE, AUDIO_DEVICE_INDEX
+import sounddevice as sd
+from ..config import AUDIO_CHANNELS, CHUNK_SIZE, AUDIO_DEVICE_INDEX
 
-# Whisper requires 16kHz audio
+# Whisper and Porcupine require 16kHz audio
 WHISPER_SAMPLE_RATE = 16000
 
 
 class MicrophoneInterface:
-    """Interface for capturing audio from microphone."""
+    """Interface for capturing audio from microphone using sounddevice."""
 
     def __init__(self, sample_rate: int = None, channels: int = None, device_index: int = None):
         """Initialize microphone interface.
 
         Args:
-            sample_rate: Audio sample rate in Hz (defaults to config, or auto-detects device rate)
+            sample_rate: Audio sample rate in Hz (defaults to 16kHz for Whisper/Porcupine)
             channels: Number of audio channels (defaults to config)
             device_index: Optional device index override (defaults to config, then auto-detect)
         """
         self.logger = logging.getLogger(__name__)
         self.channels = channels or AUDIO_CHANNELS
         self.device_index = device_index if device_index is not None else AUDIO_DEVICE_INDEX
+        self.sample_rate = sample_rate or WHISPER_SAMPLE_RATE  # Default to 16kHz
+        
         self._stream = None
-        self._audio = None
         self._running = False
         self._selected_device_index = None
         
-        # Use provided sample rate, or config default, or will auto-detect in start()
-        self.sample_rate = sample_rate or SAMPLE_RATE
+        # Audio queue for callback-based streaming
+        self._audio_queue = queue.Queue()
+        self._chunk_event = threading.Event()
 
     def start(self) -> None:
         """Start the audio stream.
         
-        Auto-detects device's native sample rate if using default config rate.
-        For USB microphones (Samson Go Mic), prefers 44.1kHz.
-        For MacBook built-in mic, uses device's native rate (typically 48kHz).
+        Uses sounddevice for reliable cross-platform audio capture.
+        Captures audio directly at 16kHz float32 (Whisper-ready format).
         
         Raises:
             RuntimeError: If no audio device found or stream cannot be opened
@@ -53,57 +56,53 @@ class MicrophoneInterface:
             return
         
         try:
-            self._audio = pyaudio.PyAudio()
-            
             # Find and select audio device
             device_index = self._find_audio_device()
             if device_index is None:
-                self._audio.terminate()
-                self._audio = None
                 raise RuntimeError("No audio input device found")
             
             self._selected_device_index = device_index
-            device_info = self._audio.get_device_info_by_index(device_index)
-            device_name = device_info['name'].lower()
-            
-            # Auto-detect sample rate based on device
-            # If using config default (44100), check if device prefers different rate
-            if self.sample_rate == SAMPLE_RATE:  # Using config default
-                device_default_rate = int(device_info['defaultSampleRate'])
-                
-                # USB microphones (like Samson Go Mic) prefer 44.1kHz
-                if 'usb' in device_name or 'samson' in device_name:
-                    # Keep 44.1kHz for USB mics
-                    self.sample_rate = 44100
-                    self.logger.info(f"Using USB microphone sample rate: {self.sample_rate}Hz")
-                elif device_default_rate in [44100, 48000]:
-                    # Use device's native rate for built-in mics (MacBook, etc.)
-                    self.sample_rate = device_default_rate
-                    self.logger.info(f"Using device native sample rate: {self.sample_rate}Hz")
-                else:
-                    # Fallback to config default
-                    self.logger.info(f"Using config sample rate: {self.sample_rate}Hz")
+            device_info = sd.query_devices(device_index)
             
             self.logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
             
-            # Open audio stream
-            self._stream = self._audio.open(
-                format=pyaudio.paInt16,
+            # Audio callback for streaming
+            def audio_callback(indata, frames, time_info, status):
+                """Callback invoked by sounddevice for each audio block."""
+                if status:
+                    self.logger.warning(f"Audio stream status: {status}")
+                
+                # Copy audio data to queue (flatten to 1D if multi-channel)
+                audio_chunk = indata.copy().flatten() if indata.ndim > 1 else indata.copy()
+                self._audio_queue.put(audio_chunk)
+                self._chunk_event.set()
+            
+            # Open audio stream with sounddevice
+            # - 16kHz sample rate (Whisper and Porcupine compatible)
+            # - float32 dtype (Whisper-ready, range -1.0 to 1.0)
+            # - Callback-based for continuous streaming
+            self._stream = sd.InputStream(
+                samplerate=self.sample_rate,
                 channels=self.channels,
-                rate=self.sample_rate,
-                input=True,
-                input_device_index=device_index,
-                frames_per_buffer=CHUNK_SIZE
+                dtype=np.float32,
+                device=device_index,
+                blocksize=CHUNK_SIZE,
+                callback=audio_callback
             )
             
+            self._stream.start()
             self._running = True
-            self.logger.info(f"Audio stream started at {self.sample_rate}Hz, {self.channels} channel(s)")
             
-        except OSError as e:
+            self.logger.info(f"Audio stream started at {self.sample_rate}Hz, {self.channels} channel(s), float32")
+            
+        except Exception as e:
             self.logger.error(f"Failed to open audio stream: {e}")
-            if self._audio:
-                self._audio.terminate()
-                self._audio = None
+            if self._stream:
+                try:
+                    self._stream.close()
+                except:
+                    pass
+                self._stream = None
             raise RuntimeError(f"Cannot open audio device: {e}") from e
 
     def stop(self) -> None:
@@ -112,32 +111,32 @@ class MicrophoneInterface:
         
         if self._stream:
             try:
-                self._stream.stop_stream()
+                self._stream.stop()
                 self._stream.close()
             except Exception as e:
                 self.logger.warning(f"Error closing audio stream: {e}")
             finally:
                 self._stream = None
         
-        if self._audio:
+        # Clear audio queue
+        while not self._audio_queue.empty():
             try:
-                self._audio.terminate()
-            except Exception as e:
-                self.logger.warning(f"Error terminating PyAudio: {e}")
-            finally:
-                self._audio = None
+                self._audio_queue.get_nowait()
+            except queue.Empty:
+                break
         
+        self._chunk_event.clear()
         self._selected_device_index = None
         self.logger.info("Audio stream stopped")
 
     def capture_audio(self, duration: float) -> np.ndarray:
-        """Capture audio for specified duration and resample to 16kHz for Whisper.
+        """Capture audio for specified duration (already at 16kHz float32 for Whisper).
 
         Args:
             duration: Duration in seconds
 
         Returns:
-            Audio data as numpy array (int16 format, 16kHz sample rate)
+            Audio data as numpy array (float32 format, 16kHz sample rate)
             
         Raises:
             RuntimeError: If microphone not started or stream error occurs
@@ -145,35 +144,36 @@ class MicrophoneInterface:
         if not self._running:
             raise RuntimeError("Microphone not started")
         
-        if not self._stream:
-            raise RuntimeError("Audio stream not available")
-        
         if duration <= 0:
             raise ValueError("Duration must be positive")
         
         try:
-            # Calculate number of frames needed
-            num_frames = int(self.sample_rate * duration)
+            # Calculate number of samples needed
+            num_samples = int(self.sample_rate * duration)
             
-            # Read audio data in chunks
-            audio_data = []
-            frames_read = 0
+            # Collect audio blocks until we have enough samples
+            audio_blocks = []
+            samples_collected = 0
             
-            while frames_read < num_frames:
-                frames_to_read = min(CHUNK_SIZE, num_frames - frames_read)
-                chunk = self._stream.read(frames_to_read, exception_on_overflow=False)
-                audio_data.append(chunk)
-                frames_read += frames_to_read
+            while samples_collected < num_samples:
+                try:
+                    # Get audio block from queue (with timeout)
+                    block = self._audio_queue.get(timeout=duration + 1.0)
+                    audio_blocks.append(block)
+                    samples_collected += len(block)
+                except queue.Empty:
+                    self.logger.warning(f"Timeout while capturing audio (got {samples_collected}/{num_samples} samples)")
+                    break
             
-            # Convert bytes to numpy array (int16)
-            audio_bytes = b''.join(audio_data)
-            audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
+            if not audio_blocks:
+                self.logger.warning("No audio captured")
+                return np.array([], dtype=np.float32)
             
-            # Resample to 16kHz if needed (for Whisper)
-            if self.sample_rate != WHISPER_SAMPLE_RATE:
-                target_length = int(len(audio_array) * WHISPER_SAMPLE_RATE / self.sample_rate)
-                audio_array = signal.resample(audio_array, target_length).astype(np.int16)
-                self.logger.debug(f"Resampled audio from {self.sample_rate}Hz to {WHISPER_SAMPLE_RATE}Hz")
+            # Concatenate and trim to exact duration
+            audio_array = np.concatenate(audio_blocks)
+            audio_array = audio_array[:num_samples]
+            
+            self.logger.debug(f"Captured {len(audio_array)} samples ({len(audio_array)/self.sample_rate:.2f}s) at {self.sample_rate}Hz")
             
             return audio_array
             
@@ -182,26 +182,35 @@ class MicrophoneInterface:
             raise RuntimeError(f"Failed to capture audio: {e}") from e
 
     def get_audio_chunk(self, chunk_size: int = None) -> Optional[np.ndarray]:
-        """Get a single chunk of audio data (blocking read).
+        """Get a single chunk of audio data (non-blocking).
 
         Args:
             chunk_size: Number of samples to read (defaults to CHUNK_SIZE)
 
         Returns:
-            Audio data as numpy array (int16 format), or None if stream not ready
+            Audio data as numpy array (float32 format), or None if no data available
         """
-        if not self._running or not self._stream:
+        if not self._running:
             return None
         
         chunk_size = chunk_size or CHUNK_SIZE
         
         try:
-            # Blocking read (waits for chunk_size samples)
-            chunk = self._stream.read(chunk_size, exception_on_overflow=False)
-            audio_array = np.frombuffer(chunk, dtype=np.int16)
-            return audio_array
-        except Exception as e:
-            self.logger.warning(f"Error reading audio chunk: {e}")
+            # Non-blocking get from queue
+            audio_chunk = self._audio_queue.get_nowait()
+            
+            # Trim or pad to requested chunk size if needed
+            if len(audio_chunk) > chunk_size:
+                return audio_chunk[:chunk_size]
+            elif len(audio_chunk) < chunk_size:
+                # Pad with zeros if chunk is smaller than requested
+                padded = np.zeros(chunk_size, dtype=np.float32)
+                padded[:len(audio_chunk)] = audio_chunk
+                return padded
+            else:
+                return audio_chunk
+                
+        except queue.Empty:
             return None
 
     def _find_audio_device(self) -> Optional[int]:
@@ -215,64 +224,53 @@ class MicrophoneInterface:
         Returns:
             Device index, or None if no device found
         """
-        if self._audio is None:
-            return None
-        
         # If device index explicitly configured, use it
         if self.device_index is not None:
             try:
-                device_info = self._audio.get_device_info_by_index(self.device_index)
-                if device_info['maxInputChannels'] > 0:
+                device_info = sd.query_devices(self.device_index)
+                if device_info['max_input_channels'] > 0:
                     self.logger.info(f"Using configured device index {self.device_index}")
                     return self.device_index
                 else:
                     self.logger.warning(f"Configured device index {self.device_index} has no input channels")
-            except OSError:
+            except (ValueError, sd.PortAudioError):
                 self.logger.warning(f"Configured device index {self.device_index} not found")
         
-        # Search for USB microphone
+        # Search for USB microphone or default device
         usb_device = None
         default_device = None
         
         try:
-            default_device = self._audio.get_default_input_device_info()
-            default_device_index = default_device['index']
-        except OSError:
-            default_device = None
-            default_device_index = None
-        
-        device_count = self._audio.get_device_count()
-        
-        for i in range(device_count):
-            try:
-                device_info = self._audio.get_device_info_by_index(i)
-                
-                # Check if device has input channels
-                if device_info['maxInputChannels'] == 0:
+            devices = sd.query_devices()
+            default_input = sd.default.device[0]  # (input_device, output_device)
+            
+            for i, device in enumerate(devices):
+                # Skip output-only devices
+                if device['max_input_channels'] == 0:
                     continue
                 
-                device_name = device_info['name'].lower()
+                device_name = device['name'].lower()
                 
-                # Prefer USB microphone
+                # Prefer USB microphone (Samson Go Mic, etc.)
                 if 'usb' in device_name or 'samson' in device_name:
                     if usb_device is None:
                         usb_device = i
-                        self.logger.info(f"Found USB microphone: {device_info['name']} (index {i})")
+                        self.logger.info(f"Found USB microphone: {device['name']} (index {i})")
                 
-                # Track default device if not already found
-                if default_device_index == i:
+                # Track default input device
+                if i == default_input:
                     default_device = i
-                    
-            except OSError:
-                continue
-        
-        # Return USB device if found, otherwise default device
-        if usb_device is not None:
-            return usb_device
-        
-        if default_device is not None:
-            device_info = self._audio.get_device_info_by_index(default_device)
-            self.logger.info(f"Using default input device: {device_info['name']} (index {default_device})")
-            return default_device
+            
+            # Return USB device if found, otherwise default device
+            if usb_device is not None:
+                return usb_device
+            
+            if default_device is not None:
+                device_info = sd.query_devices(default_device)
+                self.logger.info(f"Using default input device: {device_info['name']} (index {default_device})")
+                return default_device
+            
+        except Exception as e:
+            self.logger.error(f"Error querying audio devices: {e}")
         
         return None

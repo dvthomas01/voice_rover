@@ -3,8 +3,7 @@ pyserial>=3.5
 
 # Audio processing
 numpy>=1.24.0
-pyaudio>=0.2.13
-scipy>=1.10.0  # For audio resampling (44.1kHz/48kHz -> 16kHz)
+sounddevice>=0.4.6  # Primary audio capture (16kHz float32, Whisper-ready)
 
 # Wake word detection
 pvporcupine>=3.0.0

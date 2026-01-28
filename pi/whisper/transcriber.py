@@ -31,7 +31,7 @@ class WhisperTranscriber:
         """Transcribe audio to text.
 
         Args:
-            audio_data: Audio data as numpy array (int16, 16kHz mono)
+            audio_data: Audio data as numpy array (float32 at 16kHz from sounddevice)
             language: Language code (defaults to config)
 
         Returns:
@@ -45,15 +45,19 @@ class WhisperTranscriber:
         
         language = language or WHISPER_LANGUAGE
         
+        # sounddevice provides float32 [-1.0, 1.0], which is exactly what Whisper needs
         if audio_data.dtype == np.int16:
+            # Legacy support for int16 (from tests or other sources)
             audio_float = audio_data.astype(np.float32) / 32768.0
         else:
+            # Already float32 from sounddevice
             audio_float = audio_data.astype(np.float32)
         
         result = self._model.transcribe(
             audio_float,
             language=language,
-            task="transcribe"
+            task="transcribe",
+            fp16=False  # Use fp32 for CPU compatibility (macOS)
         )
         
         text = result["text"].strip().lower()

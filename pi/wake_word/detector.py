@@ -9,7 +9,6 @@ import logging
 import os
 from typing import Callable, Optional
 import numpy as np
-from scipy import signal
 from ..config import WAKE_WORD, WAKE_WORD_SENSITIVITY
 
 # Porcupine requires 16kHz audio
@@ -78,12 +77,11 @@ class WakeWordDetector:
     def process_audio(self, audio_chunk: np.ndarray, sample_rate: int = None) -> bool:
         """Process audio chunk and check for wake word.
         
-        Audio must be resampled to 16kHz and sliced into exact frame_length blocks
-        before processing. Porcupine is strict about format requirements.
+        Audio from sounddevice is float32 at 16kHz, ready for Porcupine processing.
 
         Args:
-            audio_chunk: Audio data as numpy array (int16 format)
-            sample_rate: Sample rate of audio_chunk (defaults to 16kHz, assumes already resampled)
+            audio_chunk: Audio data as numpy array (float32 at 16kHz from sounddevice)
+            sample_rate: Sample rate of audio_chunk (should be 16kHz)
 
         Returns:
             True if wake word detected, False otherwise
@@ -98,16 +96,10 @@ class WakeWordDetector:
             return False
         
         try:
-            # Resample to 16kHz if needed
-            if sample_rate is not None and sample_rate != PORCUPINE_SAMPLE_RATE:
-                target_length = int(len(audio_chunk) * PORCUPINE_SAMPLE_RATE / sample_rate)
-                if target_length > 0:
-                    audio_chunk = signal.resample(audio_chunk, target_length).astype(np.int16)
-                else:
-                    return False
-            
-            # Ensure audio is int16 format
-            if audio_chunk.dtype != np.int16:
+            # Convert float32 [-1.0, 1.0] to int16 [-32768, 32767] for Porcupine
+            if audio_chunk.dtype == np.float32:
+                audio_chunk = (audio_chunk * 32768.0).astype(np.int16)
+            elif audio_chunk.dtype != np.int16:
                 audio_chunk = audio_chunk.astype(np.int16)
             
             # Check if audio has sufficient amplitude (filter out silence)
