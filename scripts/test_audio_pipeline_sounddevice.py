@@ -56,8 +56,12 @@ def main():
         logger.info("Whisper model loaded")
         
         print("\n" + "=" * 60)
-        print("Ready! Speak a command and press Enter when done.")
+        print("Ready! How to use:")
         print("=" * 60)
+        print("\n1. Press Enter when ready")
+        print("2. Wait for '>>> SPEAK NOW <<<' prompt")
+        print("3. Speak your command (you have 8 seconds)")
+        print("4. Wait for transcription results")
         print("\nExample commands:")
         print("  - jarvis move forward")
         print("  - jarvis turn left 90 degrees")
@@ -66,19 +70,28 @@ def main():
         print()
         
         while True:
-            input("\nPress Enter to start recording (8 seconds)...")
+            input("\nPress Enter to start recording...")
             
-            print("\n[Recording...]", end="", flush=True)
+            # Countdown before recording
+            print("\nGet ready...")
+            import time
+            for i in range(3, 0, -1):
+                print(f"  {i}...", flush=True)
+                time.sleep(0.8)
+            
+            print("\n>>> SPEAK NOW (you have 8 seconds) <<<", flush=True)
             
             # Capture audio for 8 seconds
             audio_data = mic.capture_audio(duration=8.0)
             
+            print("\n[Recording stopped]", flush=True)
+            
             if len(audio_data) == 0:
-                print(" No audio captured")
+                print("No audio captured")
                 continue
             
-            print(f" Captured {len(audio_data)} samples")
-            print("[Transcribing...]", end="", flush=True)
+            print(f"Captured {len(audio_data)} samples ({len(audio_data)/16000:.1f} seconds)")
+            print("\n[Transcribing...]", end="", flush=True)
             
             # Transcribe
             text = transcriber.transcribe(audio_data)
