@@ -1,27 +1,18 @@
 #include "encoder_reader.h"
 
-// Static instance pointers for interrupt handlers
-EncoderReader* EncoderReader::instance_a_ = nullptr;
-EncoderReader* EncoderReader::instance_b_ = nullptr;
-
 EncoderReader::EncoderReader(int pinA, int pinB)
     : pin_a_(pinA), pin_b_(pinB), position_(0), velocity_(0.0),
       last_update_time_(0), last_position_(0) {
 }
 
 void EncoderReader::begin() {
-    // TODO: Setup encoder pins
     pinMode(pin_a_, INPUT_PULLUP);
     pinMode(pin_b_, INPUT_PULLUP);
     
-    // TODO: Attach interrupts
-    // Note: ESP32 uses different interrupt attachment than Arduino
-    // attachInterrupt(digitalPinToInterrupt(pin_a_), handleInterruptA, CHANGE);
-    // attachInterrupt(digitalPinToInterrupt(pin_b_), handleInterruptB, CHANGE);
-    
-    // Store instance for interrupt handlers
-    instance_a_ = this;
-    instance_b_ = this;
+    // Use attachInterruptArg to pass 'this' to each ISR
+    // This allows multiple encoder instances to work independently
+    attachInterruptArg(digitalPinToInterrupt(pin_a_), isrA, this, CHANGE);
+    attachInterruptArg(digitalPinToInterrupt(pin_b_), isrB, this, CHANGE);
     
     last_update_time_ = millis();
     last_position_ = position_;
@@ -56,49 +47,37 @@ void EncoderReader::update() {
     }
 }
 
-void EncoderReader::handleInterruptA() {
-    if (instance_a_) {
-        instance_a_->handlePulse(true);
-    }
+// Static ISR trampolines - cast arg to EncoderReader* and call instance method
+void IRAM_ATTR EncoderReader::isrA(void* arg) {
+    EncoderReader* encoder = static_cast<EncoderReader*>(arg);
+    encoder->handlePulse(true);
 }
 
-void EncoderReader::handleInterruptB() {
-    if (instance_b_) {
-        instance_b_->handlePulse(false);
-    }
+void IRAM_ATTR EncoderReader::isrB(void* arg) {
+    EncoderReader* encoder = static_cast<EncoderReader*>(arg);
+    encoder->handlePulse(false);
 }
 
-void EncoderReader::handlePulse(bool channelA) {
-    // TODO: Implement quadrature decoding
-    // 
-    // Quadrature encoding uses two channels 90° out of phase
-    // Direction determined by which channel leads
-    // 
-    // Channel A leads Channel B = Forward
-    // Channel B leads Channel A = Reverse
-    // 
-    // Example implementation:
-    // bool a_state = digitalRead(pin_a_);
-    // bool b_state = digitalRead(pin_b_);
-    // 
-    // if (channelA) {
-    //     if (a_state == b_state) {
-    //         position_++;  // Forward
-    //     } else {
-    //         position_--;  // Reverse
-    //     }
-    // } else {
-    //     if (a_state == b_state) {
-    //         position_--;  // Reverse
-    //     } else {
-    //         position_++;  // Forward
-    //     }
-    // }
+void IRAM_ATTR EncoderReader::handlePulse(bool channelA) {
+    // Minimal quadrature decoding for direction detection
+    // Read both pin states to determine direction
+    bool a_state = digitalRead(pin_a_);
+    bool b_state = digitalRead(pin_b_);
     
-    // Simple increment for now (replace with quadrature decoding)
+    // Quadrature logic: direction depends on which channel leads
     if (channelA) {
-        position_++;
+        // Channel A changed
+        if (a_state == b_state) {
+            position_++;  // Forward
+        } else {
+            position_--;  // Reverse
+        }
     } else {
-        position_--;
+        // Channel B changed
+        if (a_state == b_state) {
+            position_--;  // Reverse
+        } else {
+            position_++;  // Forward
+        }
     }
 }

@@ -15,11 +15,12 @@ public:
      * @param pwm_pin PWM pin for speed control
      * @param r_en_pin Right enable pin (R_EN on BTS7960)
      * @param l_en_pin Left enable pin (L_EN on BTS7960)
+     * @param ledc_channel LEDC channel (0-15, must be unique per motor)
      */
-    MotorDriver(int pwm_pin, int r_en_pin, int l_en_pin);
+    MotorDriver(int pwm_pin, int r_en_pin, int l_en_pin, int ledc_channel);
 
     /**
-     * Initialize motor driver hardware (setup pins, PWM).
+     * Initialize motor driver hardware (setup pins, LEDC PWM).
      */
     void begin();
 
@@ -33,6 +34,7 @@ public:
 
     /**
      * Stop the motor immediately.
+     * Unconditional safety stop - callable from anywhere.
      */
     void stop();
 
@@ -47,6 +49,7 @@ private:
     int pwm_pin_;
     int r_en_pin_;  // Right enable (forward direction)
     int l_en_pin_;  // Left enable (reverse direction)
+    int ledc_channel_;  // LEDC channel for this motor
     int current_speed_;
 
     /**

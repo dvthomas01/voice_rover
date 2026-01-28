@@ -23,43 +23,39 @@ void CommandHandler::begin() {
 }
 
 bool CommandHandler::processCommand(const String& json_string) {
-    // TODO: Parse JSON and route to appropriate handler
-    // CRITICAL: Must validate all JSON inputs to prevent crashes
-    
     StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, json_string);
     
     if (error) {
-        sendResponse(false, "Invalid JSON: " + String(error.c_str()));
+        sendResponse(false, "JSON parse error: " + String(error.c_str()));
         return false;
     }
     
-    // Validate command structure
+    // Validate basic structure
     if (!validateCommand(doc)) {
-        sendResponse(false, "Invalid command structure");
+        sendResponse(false, "Missing or invalid command/parameters");
         return false;
     }
     
     String command = doc["command"].as<String>();
     int priority = doc["priority"] | 0;
     
-    // Handle STOP command immediately (highest priority)
+    // STOP command bypass (immediate, highest priority)
     if (command == "stop" || priority == 100) {
         executeStop();
-        sendResponse(true, "Stop command executed");
+        sendResponse(true, "Emergency stop executed");
         return true;
     }
     
-    JsonObject params = doc["parameters"].as<JsonObject>();
+    // Get parameters object (treat missing as empty)
+    JsonObject params = doc["parameters"] | doc.createNestedObject("parameters");
     
-    // Route to appropriate handler
-    // Primitive commands: move_forward, move_backward, rotate_clockwise, rotate_counterclockwise
+    // Route to handler based on command type
     if (command == "move_forward" || command == "move_backward" ||
         command == "rotate_clockwise" || command == "rotate_counterclockwise") {
         return executePrimitiveCommand(command, params);
     }
     
-    // Intermediate commands: turn_left, turn_right, move_forward_for_time, etc.
     if (command == "turn_left" || command == "turn_right" ||
         command == "move_forward_for_time" || command == "move_backward_for_time" ||
         command == "make_square" || command == "make_circle" || command == "make_star" ||
@@ -72,42 +68,61 @@ bool CommandHandler::processCommand(const String& json_string) {
 }
 
 bool CommandHandler::executePrimitiveCommand(const String& command, JsonObject params) {
-    // TODO: Execute primitive commands by modifying balance controller setpoints
-    // 
-    // Commands modify balance, don't replace it:
-    // - move_forward: Set positive velocity setpoint
-    // - move_backward: Set negative velocity setpoint
-    // - rotate_clockwise: Set positive rotation setpoint
-    // - rotate_counterclockwise: Set negative rotation setpoint
+    // Extract and validate speed parameter
+    float speed = params["speed"] | 0.4;  // Default 0.4
+    float original_speed = speed;
     
-    float speed = params["speed"] | 0.4;  // Default speed 0.4
+    // Validate speed type
+    if (!params["speed"].is<float>() && !params["speed"].isNull()) {
+        sendResponse(false, "Invalid speed type (must be numeric)");
+        return false;
+    }
+    
+    // Clamp speed to valid range [0.0, 1.0]
+    speed = constrain(speed, 0.0f, 1.0f);
     float motor_speed = speedToMotorValue(speed);
     
+    // Build response message with clamping info if needed
+    String response_msg;
+    bool clamped = (speed != original_speed);
+    
     if (command == "move_forward") {
-        // TODO: Set forward velocity setpoint
         balance_controller_->setVelocitySetpoint(motor_speed);
-        sendResponse(true, "Moving forward");
+        response_msg = "Moving forward";
+        if (clamped) {
+            response_msg += " (speed clamped " + String(original_speed, 2) + " -> " + String(speed, 2) + ")";
+        }
+        sendResponse(true, response_msg);
         return true;
     }
     
     if (command == "move_backward") {
-        // TODO: Set backward velocity setpoint
         balance_controller_->setVelocitySetpoint(-motor_speed);
-        sendResponse(true, "Moving backward");
+        response_msg = "Moving backward";
+        if (clamped) {
+            response_msg += " (speed clamped " + String(original_speed, 2) + " -> " + String(speed, 2) + ")";
+        }
+        sendResponse(true, response_msg);
         return true;
     }
     
     if (command == "rotate_clockwise") {
-        // TODO: Set clockwise rotation setpoint
         balance_controller_->setRotationSetpoint(motor_speed);
-        sendResponse(true, "Rotating clockwise");
+        response_msg = "Rotating clockwise";
+        if (clamped) {
+            response_msg += " (speed clamped " + String(original_speed, 2) + " -> " + String(speed, 2) + ")";
+        }
+        sendResponse(true, response_msg);
         return true;
     }
     
     if (command == "rotate_counterclockwise") {
-        // TODO: Set counterclockwise rotation setpoint
         balance_controller_->setRotationSetpoint(-motor_speed);
-        sendResponse(true, "Rotating counterclockwise");
+        response_msg = "Rotating counterclockwise";
+        if (clamped) {
+            response_msg += " (speed clamped " + String(original_speed, 2) + " -> " + String(speed, 2) + ")";
+        }
+        sendResponse(true, response_msg);
         return true;
     }
     
@@ -122,36 +137,14 @@ bool CommandHandler::executeIntermediateCommand(const String& command, JsonObjec
     // Pattern commands: Execute sequence of primitives
     
     if (command == "turn_left" || command == "turn_right") {
-        // TODO: Implement angle-based turning
-        // 1. Get target angle from params
-        // 2. Set rotation setpoint
-        // 3. Monitor encoder difference until target angle reached
-        // 4. Clear rotation setpoint
-        
-        float angle = params["angle"] | 90.0;
-        float speed = params["speed"] | 0.4;
-        
-        // Enqueue command for tracking
-        if (enqueueCommand(command, params)) {
-            sendResponse(true, "Turning " + String(angle) + " degrees");
-            return true;
-        }
+        // Angle-based turning - not yet implemented (requires processQueue)
+        sendResponse(false, "Command not implemented yet: " + command);
         return false;
     }
     
     if (command == "move_forward_for_time" || command == "move_backward_for_time") {
-        // TODO: Implement time-based movement
-        // 1. Get duration from params
-        // 2. Set velocity setpoint
-        // 3. Track time, clear setpoint when duration elapsed
-        
-        float duration = params["duration"] | 1.0;
-        float speed = params["speed"] | 0.4;
-        
-        if (enqueueCommand(command, params)) {
-            sendResponse(true, "Moving for " + String(duration) + " seconds");
-            return true;
-        }
+        // Time-based movement - not yet implemented (requires processQueue)
+        sendResponse(false, "Command not implemented yet: " + command);
         return false;
     }
     
@@ -195,21 +188,18 @@ void CommandHandler::update() {
 }
 
 bool CommandHandler::validateCommand(JsonDocument& doc) {
-    // TODO: Validate command structure
-    // - Check "command" field exists and is string
-    // - Check "parameters" field exists and is object
-    // - Check "priority" field if present
-    // - Validate parameter types and ranges
-    
-    if (!doc.containsKey("command")) {
+    // Validate command field (required, must be string)
+    if (!doc.containsKey("command") || !doc["command"].is<String>()) {
         return false;
     }
     
-    if (!doc["command"].is<String>()) {
-        return false;
-    }
-    
+    // Validate parameters field (optional, but if present must be object)
     if (doc.containsKey("parameters") && !doc["parameters"].is<JsonObject>()) {
+        return false;
+    }
+    
+    // Validate priority field (optional, but if present must be numeric)
+    if (doc.containsKey("priority") && !doc["priority"].is<int>()) {
         return false;
     }
     
@@ -222,18 +212,20 @@ void CommandHandler::clearQueue() {
     queue_size_ = 0;
 }
 
-bool CommandHandler::enqueueCommand(const String& command, JsonObject params) {
-    // TODO: Add command to FIFO queue
-    // Check queue not full
-    // Store command with start time
-    
+bool CommandHandler::enqueueCommand(const String& command, float speed, float duration, float angle) {
+    // Add command to FIFO queue with copied primitives
     if (queue_size_ >= MAX_QUEUE_SIZE) {
         return false;
     }
     
-    command_queue_[queue_tail_].type = command;
-    command_queue_[queue_tail_].start_time = millis();
-    // TODO: Store params and calculate targets
+    Command& cmd = command_queue_[queue_tail_];
+    cmd.type = command;
+    cmd.start_time = millis();
+    cmd.speed = speed;
+    cmd.duration = duration;
+    cmd.angle = angle;
+    cmd.target_angle = 0.0;  // Calculated when execution starts
+    cmd.target_distance = 0.0;
     
     queue_tail_ = (queue_tail_ + 1) % MAX_QUEUE_SIZE;
     queue_size_++;

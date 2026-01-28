@@ -9,8 +9,8 @@
 
 // Global objects
 BalanceController balanceController(KP, KI, KD);
-MotorDriver leftMotor(MOTOR_LEFT_PWM, MOTOR_LEFT_R_EN, MOTOR_LEFT_L_EN);
-MotorDriver rightMotor(MOTOR_RIGHT_PWM, MOTOR_RIGHT_R_EN, MOTOR_RIGHT_L_EN);
+MotorDriver leftMotor(MOTOR_LEFT_PWM, MOTOR_LEFT_R_EN, MOTOR_LEFT_L_EN, 0);  // LEDC channel 0
+MotorDriver rightMotor(MOTOR_RIGHT_PWM, MOTOR_RIGHT_R_EN, MOTOR_RIGHT_L_EN, 1);  // LEDC channel 1
 IMU imu;
 EncoderReader leftEncoder(ENCODER_LEFT_A, ENCODER_LEFT_B);
 EncoderReader rightEncoder(ENCODER_RIGHT_A, ENCODER_RIGHT_B);

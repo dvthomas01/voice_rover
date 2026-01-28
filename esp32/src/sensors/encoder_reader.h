@@ -53,18 +53,6 @@ public:
      */
     void update();
 
-    /**
-     * Static interrupt handler for channel A.
-     * Must be attached in begin().
-     */
-    static void handleInterruptA();
-
-    /**
-     * Static interrupt handler for channel B.
-     * Must be attached in begin().
-     */
-    static void handleInterruptB();
-
 private:
     int pin_a_;
     int pin_b_;
@@ -73,15 +61,18 @@ private:
     unsigned long last_update_time_;
     long last_position_;
     
-    // Static instances for interrupt handlers
-    static EncoderReader* instance_a_;
-    static EncoderReader* instance_b_;
+    /**
+     * Static ISR trampolines for attachInterruptArg.
+     * These cast the arg back to EncoderReader* and call the instance method.
+     */
+    static void IRAM_ATTR isrA(void* arg);
+    static void IRAM_ATTR isrB(void* arg);
     
     /**
      * Handle encoder pulse (called from interrupt).
-     * Determines direction based on quadrature encoding.
+     * Implements minimal quadrature decoding for direction.
      */
-    void handlePulse(bool channelA);
+    void IRAM_ATTR handlePulse(bool channelA);
 };
 
 #endif // ENCODER_READER_H

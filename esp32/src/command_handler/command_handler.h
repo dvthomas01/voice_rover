@@ -96,12 +96,15 @@ private:
     EncoderReader* left_encoder_;
     EncoderReader* right_encoder_;
 
-    // Command queue (FIFO)
+    // Command queue (FIFO) with copied primitives (safe for persistence)
     struct Command {
         String type;
-        JsonObject params;
         unsigned long start_time;
-        float target_angle;  // For angle-based commands
+        // Copied parameters (no JsonObject lifetime issues)
+        float speed;
+        float duration;
+        float angle;
+        float target_angle;  // For angle-based commands (encoder target)
         float target_distance;  // For distance-based commands (if needed)
     };
     
@@ -113,7 +116,7 @@ private:
 
     bool validateCommand(JsonDocument& doc);
     void clearQueue();
-    bool enqueueCommand(const String& command, JsonObject params);
+    bool enqueueCommand(const String& command, float speed, float duration, float angle);
     void processQueue();
     
     // Helper functions
