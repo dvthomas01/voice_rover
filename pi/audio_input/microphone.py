@@ -129,11 +129,26 @@ class MicrophoneInterface:
         self._selected_device_index = None
         self.logger.info("Audio stream stopped")
 
+    def clear_buffer(self) -> None:
+        """Clear audio buffer queue to discard any buffered audio.
+        
+        Call this before starting a fresh recording to avoid carryover from previous audio.
+        """
+        while not self._audio_queue.empty():
+            try:
+                self._audio_queue.get_nowait()
+            except queue.Empty:
+                break
+        self.logger.debug("Audio buffer cleared")
+
     def capture_audio(self, duration: float) -> np.ndarray:
         """Capture audio for specified duration (already at 16kHz float32 for Whisper).
+        
+        Captures exactly the specified duration of fresh audio. Any buffered audio is discarded
+        at the start to ensure clean recordings without carryover.
 
         Args:
-            duration: Duration in seconds
+            duration: Duration in seconds (will capture exactly this amount)
 
         Returns:
             Audio data as numpy array (float32 format, 16kHz sample rate)
@@ -148,17 +163,21 @@ class MicrophoneInterface:
             raise ValueError("Duration must be positive")
         
         try:
-            # Calculate number of samples needed
+            # Calculate number of samples needed (exact)
             num_samples = int(self.sample_rate * duration)
             
-            # Collect audio blocks until we have enough samples
+            # Clear any buffered audio to start fresh
+            self.clear_buffer()
+            self.logger.debug(f"Starting fresh capture of {duration}s ({num_samples} samples)")
+            
+            # Collect audio blocks until we have exactly enough samples
             audio_blocks = []
             samples_collected = 0
             
             while samples_collected < num_samples:
                 try:
-                    # Get audio block from queue (with timeout)
-                    block = self._audio_queue.get(timeout=duration + 1.0)
+                    # Get audio block from queue (with timeout slightly longer than duration)
+                    block = self._audio_queue.get(timeout=duration + 2.0)
                     audio_blocks.append(block)
                     samples_collected += len(block)
                 except queue.Empty:
@@ -169,11 +188,14 @@ class MicrophoneInterface:
                 self.logger.warning("No audio captured")
                 return np.array([], dtype=np.float32)
             
-            # Concatenate and trim to exact duration
+            # Concatenate and trim to EXACT duration (discard any excess)
             audio_array = np.concatenate(audio_blocks)
             audio_array = audio_array[:num_samples]
             
-            self.logger.debug(f"Captured {len(audio_array)} samples ({len(audio_array)/self.sample_rate:.2f}s) at {self.sample_rate}Hz")
+            # Clear any remaining buffered audio to prevent carryover to next recording
+            self.clear_buffer()
+            
+            self.logger.debug(f"Captured exactly {len(audio_array)} samples ({len(audio_array)/self.sample_rate:.2f}s)")
             
             return audio_array
             

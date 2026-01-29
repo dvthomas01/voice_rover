@@ -59,9 +59,11 @@ def main():
         print("Ready! How to use:")
         print("=" * 60)
         print("\n1. Press Enter when ready")
-        print("2. Wait for '>>> SPEAK NOW <<<' prompt")
-        print("3. Speak your command (you have 8 seconds)")
-        print("4. Wait for transcription results")
+        print("2. Wait for 3-2-1 countdown")
+        print("3. After '>>> SPEAK NOW <<<', speak your command")
+        print("4. You have exactly 8 seconds to speak")
+        print("5. Recording ends with '--- END OF RECORDING ---'")
+        print("6. Transcription begins (any leftover audio is discarded)")
         print("\nExample commands:")
         print("  - jarvis move forward")
         print("  - jarvis turn left 90 degrees")
@@ -72,6 +74,9 @@ def main():
         while True:
             input("\nPress Enter to start recording...")
             
+            # Clear any buffered audio from previous recording
+            mic.clear_buffer()
+            
             # Countdown before recording
             print("\nGet ready...")
             import time
@@ -81,10 +86,10 @@ def main():
             
             print("\n>>> SPEAK NOW (you have 8 seconds) <<<", flush=True)
             
-            # Capture audio for 8 seconds
+            # Capture exactly 8 seconds of fresh audio
             audio_data = mic.capture_audio(duration=8.0)
             
-            print("\n[Recording stopped]", flush=True)
+            print("\n--- END OF RECORDING ---", flush=True)
             
             if len(audio_data) == 0:
                 print("No audio captured")
