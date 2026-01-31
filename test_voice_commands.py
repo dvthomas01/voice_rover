@@ -27,9 +27,9 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from faster_whisper import WhisperModel
+    import whisper
 except ImportError:
-    print("Error: faster-whisper not installed. Run: pip install faster-whisper")
+    print("Error: whisper not installed. Run: pip install openai-whisper")
     sys.exit(1)
 
 
@@ -152,11 +152,10 @@ def main():
     print("=" * 60)
     print("Voice Command Test")
     print("=" * 60)
-    print("\nLoading faster-whisper model (base)...")
-
-    # Load faster-whisper model
-    # On Raspberry Pi / CPU, int8 compute type is a good speed/accuracy tradeoff
-    model = WhisperModel("base", device="cpu", compute_type="int8")
+    print("\nLoading Whisper model (base)...")
+    
+    # Load Whisper model
+    model = whisper.load_model("base")
     print("Model loaded!\n")
     
     print("Listening for commands:")
@@ -212,14 +211,14 @@ def main():
                         
                         print(" [Transcribing...]", end="", flush=True)
                         
-                        # Transcribe with faster-whisper
-                        segments, info = model.transcribe(
+                        # Transcribe with Whisper
+                        result = model.transcribe(
                             audio_data,
                             language="en",
-                            beam_size=1,
+                            fp16=False,  # Use fp32 for CPU compatibility
                         )
-
-                        text = "".join(segment.text for segment in segments).strip()
+                        
+                        text = result["text"].strip()
                         
                         if text:
                             print(f'\n  Heard: "{text}"')
