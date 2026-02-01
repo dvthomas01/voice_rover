@@ -19,6 +19,8 @@ import re
 import sys
 import queue
 import numpy as np
+import json
+import os
 
 try:
     import sounddevice as sd
@@ -27,53 +29,47 @@ except ImportError:
     sys.exit(1)
 
 try:
-    import whisper
+    from vosk import Model, KaldiRecognizer
 except ImportError:
-    print("Error: whisper not installed. Run: pip install openai-whisper")
+    print("Error: vosk not installed. Run: pip install vosk")
     sys.exit(1)
 
 
 # Audio settings
-# Force USB microphone (Go Mic Video)
-MIC_INDEX = 1  # Go Mic Video: USB Audio (hw:3,0)
-SAMPLE_RATE = 44100  # Mic's hardware sample rate
-WHISPER_SAMPLE_RATE = 16000  # Whisper expects 16kHz
+# On Mac, use default input device (set MIC_INDEX = None); on Pi you can set it explicitly.
+MIC_INDEX = None  # use default microphone; set to an index from sd.query_devices() if needed
+SAMPLE_RATE = 16000  # Vosk models typically expect 16kHz mono
 CHANNELS = 1
 BLOCK_DURATION = 0.5  # seconds per audio block
 SILENCE_THRESHOLD = 0.01  # RMS threshold for silence detection
 SILENCE_DURATION = 1.0  # seconds of silence to end recording
 MAX_RECORD_DURATION = 5.0  # max seconds to record
 
-# Command patterns with default speeds
+# Path to Vosk model - use absolute path relative to this script's location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(SCRIPT_DIR, "models", "vosk-model-small-en-us-0.15")
+
+# Command patterns with default speeds (primitive motion commands)
 COMMANDS = {
-    "move_forward": {
-        "patterns": [r"move\s+forward", r"go\s+forward", r"^forward$"],
+    "forward": {
+        "patterns": [r"\bforward\b", r"go\s+forward", r"move\s+forward"],
         "speed": 0.4,
-        "display": "MOVE FORWARD",
+        "display": "FORWARD",
     },
-    "move_backward": {
-        "patterns": [r"move\s+backward", r"go\s+backward", r"^backward$", r"back\s*up"],
+    "backward": {
+        "patterns": [r"\bbackward\b", r"go\s+backward", r"move\s+backward", r"back\s*up"],
         "speed": 0.4,
-        "display": "MOVE BACKWARD",
+        "display": "BACKWARD",
     },
-    "rotate_clockwise": {
-        "patterns": [r"rotate\s+clockwise", r"turn\s+right", r"spin\s+right"],
+    "left": {
+        "patterns": [r"\bleft\b", r"turn\s+left", r"rotate\s+left"],
         "speed": 0.4,
-        "display": "ROTATE CLOCKWISE",
+        "display": "LEFT",
     },
-    "rotate_counterclockwise": {
-        "patterns": [
-            r"rotate\s+counter\s*clockwise",
-            r"turn\s+left",
-            r"spin\s+left",
-        ],
+    "right": {
+        "patterns": [r"\bright\b", r"turn\s+right", r"rotate\s+right"],
         "speed": 0.4,
-        "display": "ROTATE COUNTERCLOCKWISE",
-    },
-    "stop": {
-        "patterns": [r"^stop$", r"halt", r"emergency\s+stop"],
-        "speed": None,
-        "display": "STOP",
+        "display": "RIGHT",
     },
 }
 
@@ -83,20 +79,6 @@ def calculate_rms(audio_data: np.ndarray) -> float:
     return np.sqrt(np.mean(audio_data**2))
 
 
-# Resample audio to 16kHz for Whisper
-def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
-    """Resample 1D audio array from orig_sr to target_sr using linear interpolation."""
-    if orig_sr == target_sr or audio.size == 0:
-        return audio
-
-    duration = audio.shape[0] / float(orig_sr)
-    target_len = int(round(duration * target_sr))
-
-    # Use indices in time to interpolate
-    old_times = np.linspace(0.0, duration, num=audio.shape[0], endpoint=False)
-    new_times = np.linspace(0.0, duration, num=target_len, endpoint=False)
-
-    return np.interp(new_times, old_times, audio).astype(np.float32)
 
 
 def detect_command(text: str) -> dict | None:
@@ -171,18 +153,17 @@ def main():
     print("=" * 60)
     print("Voice Command Test")
     print("=" * 60)
-    print("\nLoading Whisper model (tiny)...")
-    
-    # Load a smaller Whisper model for better realtime performance on the Pi
-    model = whisper.load_model("tiny")
+    print("\nLoading Vosk model...")
+
+    # Load Vosk model
+    model = Model(MODEL_PATH)
     print("Model loaded!\n")
-    
+
     print("Listening for commands:")
-    print("  - Move forward")
-    print("  - Move backward")
-    print("  - Rotate clockwise")
-    print("  - Rotate counterclockwise")
-    print("  - Stop")
+    print("  - forward")
+    print("  - backward")
+    print("  - left")
+    print("  - right")
     print("\nPress Ctrl+C to exit.\n")
     print("-" * 60)
     
@@ -226,24 +207,25 @@ def main():
                         
                         audio_data = np.concatenate(audio_blocks)
 
-                        # Skip if too short (use recording sample rate)
+                        # Skip if too short
                         if len(audio_data) < SAMPLE_RATE * 0.3:  # Less than 0.3 seconds
                             print(" (too short)", flush=True)
                             continue
 
-                        # Resample to Whisper's expected sample rate
-                        audio_for_whisper = resample_audio(audio_data, SAMPLE_RATE, WHISPER_SAMPLE_RATE)
+                        print(" [Recognizing...]", end="", flush=True)
 
-                        print(" [Transcribing...]", end="", flush=True)
+                        # Convert float32 audio (-1..1) to 16-bit PCM bytes for Vosk
+                        audio_int16 = (audio_data * 32767).astype(np.int16).tobytes()
 
-                        # Transcribe with Whisper (16kHz mono float32)
-                        result = model.transcribe(
-                            audio_for_whisper,
-                            language="en",
-                            fp16=False,  # Use fp32 for CPU compatibility
-                        )
-                        
-                        text = result["text"].strip()
+                        # Create a fresh recognizer per utterance
+                        rec = KaldiRecognizer(model, SAMPLE_RATE)
+
+                        if rec.AcceptWaveform(audio_int16):
+                            res = json.loads(rec.Result())
+                        else:
+                            res = json.loads(rec.FinalResult())
+
+                        text = res.get("text", "").strip()
                         
                         if text:
                             print(f'\n  Heard: "{text}"')
