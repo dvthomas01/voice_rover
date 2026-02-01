@@ -171,10 +171,10 @@ def main():
     print("=" * 60)
     print("Voice Command Test")
     print("=" * 60)
-    print("\nLoading Whisper model (base)...")
+    print("\nLoading Whisper model (tiny)...")
     
-    # Load Whisper model
-    model = whisper.load_model("base")
+    # Load a smaller Whisper model for better realtime performance on the Pi
+    model = whisper.load_model("tiny")
     print("Model loaded!\n")
     
     print("Listening for commands:")
@@ -191,7 +191,8 @@ def main():
     
     def audio_callback(indata, frames, time_info, status):
         """Callback for audio stream."""
-        if status:
+        # Ignore benign overflow messages to avoid spamming the console
+        if status and "overflow" not in str(status).lower():
             print(f"Audio status: {status}", file=sys.stderr)
         audio_queue.put(indata.copy().flatten())
     
@@ -204,6 +205,7 @@ def main():
             dtype=np.float32,
             blocksize=int(SAMPLE_RATE * BLOCK_DURATION),
             callback=audio_callback,
+            latency='high',  # extra buffering to reduce overflows on the Pi
         ):
             while True:
                 # Wait for audio above threshold (voice activity)
