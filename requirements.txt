@@ -10,11 +10,21 @@ pvporcupine>=3.0.0
 # Note: Requires Porcupine access key (set PORCUPINE_ACCESS_KEY env var)
 # Get key from: https://console.picovoice.ai/
 
-# Speech-to-text
-openai-whisper>=20230314
-torch>=2.0.0
-# Note: Whisper models are downloaded automatically on first use
-# Model sizes: tiny, base, small, medium, large (base recommended for speed)
+# Speech-to-text OPTIONS (choose one):
+
+# Option 1: VOSK (RECOMMENDED for Raspberry Pi - fast, lightweight, offline)
+vosk>=0.3.45
+# Download model: https://alphacephei.com/vosk/models
+# Place in: models/vosk-model-small-en-us-0.15/
+
+# Option 2: faster-whisper (good for Pi - 2-4x faster than openai-whisper)
+# faster-whisper>=0.10.0
+
+# Option 3: Standard Whisper (slow on Pi, may have "illegal instruction" errors)
+# openai-whisper>=20230314
+# torch>=2.0.0
+
+# Note: Uncomment only ONE option above. VOSK is recommended for best Pi performance.
 
 # Testing
 pytest>=7.4.0

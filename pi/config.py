@@ -14,6 +14,12 @@ WAKE_WORD_SENSITIVITY = 0.5
 # Whisper settings
 WHISPER_MODEL_SIZE = "base"  # Options: tiny, base, small, medium, large
 WHISPER_LANGUAGE = "en"
+WHISPER_SAMPLE_RATE = 16000  # Required sample rate for Whisper/Porcupine/VOSK
+
+# VOSK settings (lightweight alternative to Whisper, optimized for Pi)
+# Download model from: https://alphacephei.com/vosk/models
+# Recommended: vosk-model-small-en-us-0.15 (40 MB, fast, good for commands)
+VOSK_MODEL_PATH = "models/vosk-model-small-en-us-0.15"  # Path to VOSK model directory
 
 # Serial communication settings
 SERIAL_PORT = "/dev/ttyUSB0"
