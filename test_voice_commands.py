@@ -36,7 +36,8 @@ except ImportError:
 # Audio settings
 # Force USB microphone (Go Mic Video)
 MIC_INDEX = 1  # Go Mic Video: USB Audio (hw:3,0)
-SAMPLE_RATE = 16000  # Whisper expects 16kHz
+SAMPLE_RATE = 44100  # Mic's hardware sample rate
+WHISPER_SAMPLE_RATE = 16000  # Whisper expects 16kHz
 CHANNELS = 1
 BLOCK_DURATION = 0.5  # seconds per audio block
 SILENCE_THRESHOLD = 0.01  # RMS threshold for silence detection
@@ -80,6 +81,22 @@ COMMANDS = {
 def calculate_rms(audio_data: np.ndarray) -> float:
     """Calculate RMS (root mean square) of audio data."""
     return np.sqrt(np.mean(audio_data**2))
+
+
+# Resample audio to 16kHz for Whisper
+def resample_audio(audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
+    """Resample 1D audio array from orig_sr to target_sr using linear interpolation."""
+    if orig_sr == target_sr or audio.size == 0:
+        return audio
+
+    duration = audio.shape[0] / float(orig_sr)
+    target_len = int(round(duration * target_sr))
+
+    # Use indices in time to interpolate
+    old_times = np.linspace(0.0, duration, num=audio.shape[0], endpoint=False)
+    new_times = np.linspace(0.0, duration, num=target_len, endpoint=False)
+
+    return np.interp(new_times, old_times, audio).astype(np.float32)
 
 
 def detect_command(text: str) -> dict | None:
@@ -206,17 +223,20 @@ def main():
                             audio_blocks.append(remaining_audio)
                         
                         audio_data = np.concatenate(audio_blocks)
-                        
-                        # Skip if too short
+
+                        # Skip if too short (use recording sample rate)
                         if len(audio_data) < SAMPLE_RATE * 0.3:  # Less than 0.3 seconds
                             print(" (too short)", flush=True)
                             continue
-                        
+
+                        # Resample to Whisper's expected sample rate
+                        audio_for_whisper = resample_audio(audio_data, SAMPLE_RATE, WHISPER_SAMPLE_RATE)
+
                         print(" [Transcribing...]", end="", flush=True)
-                        
-                        # Transcribe with Whisper
+
+                        # Transcribe with Whisper (16kHz mono float32)
                         result = model.transcribe(
-                            audio_data,
+                            audio_for_whisper,
                             language="en",
                             fp16=False,  # Use fp32 for CPU compatibility
                         )
