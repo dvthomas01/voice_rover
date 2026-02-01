@@ -83,3 +83,40 @@ float BalanceController::calculatePID(float angle, float angular_velocity) {
 void BalanceController::limitIntegral() {
     integral_ = constrain(integral_, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 }
+
+// ========== PID TUNING HELPERS ==========
+
+float BalanceController::getPTerm() const {
+    const float target_angle = BALANCE_ANGLE_OFFSET;
+    float error = last_angle_ - target_angle;
+    return kp_ * error;
+}
+
+float BalanceController::getITerm() const {
+    return ki_ * integral_;
+}
+
+float BalanceController::getDTerm(float angular_velocity) const {
+    return -kd_ * angular_velocity;
+}
+
+float BalanceController::getError() const {
+    const float target_angle = BALANCE_ANGLE_OFFSET;
+    return last_angle_ - target_angle;
+}
+
+float BalanceController::getIntegral() const {
+    return integral_;
+}
+
+void BalanceController::setGains(float kp, float ki, float kd) {
+    kp_ = kp;
+    ki_ = ki;
+    kd_ = kd;
+}
+
+void BalanceController::getGains(float& kp, float& ki, float& kd) const {
+    kp = kp_;
+    ki = ki_;
+    kd = kd_;
+}

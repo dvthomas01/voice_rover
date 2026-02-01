@@ -84,6 +84,23 @@ public:
      */
     float getRotationSetpoint() const;
 
+    // ========== PID TUNING HELPERS ==========
+    /**
+     * Get individual PID term values for tuning/debugging.
+     * These methods help visualize what each term is contributing.
+     */
+    float getPTerm() const;
+    float getITerm() const;
+    float getDTerm(float angular_velocity) const;
+    float getError() const;
+    float getIntegral() const;
+    
+    /**
+     * Dynamically update PID gains during runtime (for tuning).
+     */
+    void setGains(float kp, float ki, float kd);
+    void getGains(float& kp, float& ki, float& kd) const;
+
 private:
     float kp_, ki_, kd_;
     float integral_;

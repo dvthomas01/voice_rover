@@ -39,6 +39,20 @@ def main():
     print("\nPress Ctrl+C to exit.\n")
     print("-" * 60)
     
+    # Show available devices first
+    print("\nDetecting audio devices...")
+    import sounddevice as sd
+    devices = sd.query_devices()
+    default_input = sd.default.device[0]
+    
+    print("\nAvailable input devices:")
+    for i, device in enumerate(devices):
+        if device['max_input_channels'] > 0:
+            marker = " [DEFAULT]" if i == default_input else ""
+            usb_marker = " [USB]" if 'usb' in device['name'].lower() or 'samson' in device['name'].lower() else ""
+            print(f"  {i}: {device['name']}{marker}{usb_marker}")
+    print()
+    
     # Initialize components
     mic = MicrophoneInterface()
     transcriber = WhisperTranscriber()

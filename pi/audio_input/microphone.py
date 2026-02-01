@@ -273,8 +273,8 @@ class MicrophoneInterface:
                 
                 device_name = device['name'].lower()
                 
-                # Prefer USB microphone (Samson Go Mic, etc.)
-                if 'usb' in device_name or 'samson' in device_name:
+                # Prefer USB microphone (Samson Go Mic, Go Mic Video, or any USB mic)
+                if 'usb' in device_name or 'samson' in device_name or 'go mic' in device_name:
                     if usb_device is None:
                         usb_device = i
                         self.logger.info(f"Found USB microphone: {device['name']} (index {i})")
